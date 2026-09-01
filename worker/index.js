@@ -9,6 +9,12 @@ import {
   verifyToken
 } from "./auth.js";
 import { AuctionRoom } from "./auction-room.js";
+import {
+  SETTLE_STATE,
+  rpcUrlForEnv,
+  verifyPendingSettlements,
+  verifySettlement
+} from "./settle-verify.js";
 
 export { AuctionRoom };
 
@@ -48,6 +54,12 @@ export default {
         : json({ error: "Unexpected server error." }, 500);
       return withCors(response, request, url);
     }
+  },
+
+  // Scheduled pass: retry pending settlement verifications against the
+  // public Nimiq RPC. Wired via wrangler.jsonc triggers.crons.
+  async scheduled(event, env) {
+    return verifyPendingSettlements(env, { now: Date.now() });
   }
 };
 
@@ -91,7 +103,7 @@ async function routeRequest(request, env, url) {
     return listLots(env, url);
   }
 
-  const lotActionMatch = url.pathname.match(/^\/api\/lots\/([^/]+)\/(start|settle)$/);
+  const lotActionMatch = url.pathname.match(/^\/api\/lots\/([^/]+)\/(start|settle|verify)$/);
   if (lotActionMatch) {
     const lotId = decodeLotId(lotActionMatch[1]);
     if (request.method === "POST" && lotActionMatch[2] === "start") {
@@ -99,6 +111,9 @@ async function routeRequest(request, env, url) {
     }
     if (request.method === "POST" && lotActionMatch[2] === "settle") {
       return settleLot(request, env, lotId);
+    }
+    if (request.method === "POST" && lotActionMatch[2] === "verify") {
+      return verifyLotSettlement(request, env, lotId);
     }
     return json({ error: "Method not allowed." }, 405, {
       allow: "POST"
@@ -418,7 +433,8 @@ async function listLots(env, url) {
     `SELECT id, title, description, image_url, host_paddle, host_address,
             start_price_lunas, min_increment_lunas, duration_sec, status,
             scheduled_at, started_at, ended_at, winning_paddle,
-            winning_bid_lunas, tx_hash, created_at
+            winning_bid_lunas, tx_hash, created_at,
+            settle_verified, settle_checked_at, settle_failure
      FROM lots
      WHERE status IN ('created', 'live', 'sold', 'settled')
      ORDER BY
@@ -533,7 +549,8 @@ async function settleLot(request, env, lotId) {
 
   const updated = await database.prepare(
     `UPDATE lots
-     SET status = 'settled', tx_hash = ?
+     SET status = 'settled', tx_hash = ?, settle_verified = 0,
+         settle_checked_at = NULL, settle_failure = NULL
      WHERE id = ? AND status = 'sold' AND winning_paddle = ? AND tx_hash IS NULL`
   ).bind(txHash, lotId, paddle).run();
 
@@ -546,6 +563,87 @@ async function settleLot(request, env, lotId) {
   }
 
   return json(settlementResponse({ ...row, status: "settled", tx_hash: txHash }), 201);
+}
+
+// On-demand settlement verification. The receipt is labeled pending until
+// this (or the scheduled pass) sees the payment on chain. Auth matches the
+// settle endpoint: only the winning paddle can trigger a re-check.
+async function verifyLotSettlement(request, env, lotId) {
+  const body = await readJson(request);
+  const database = requireDb(env);
+  const row = await selectLot(database, lotId);
+  if (!row) throw new ApiError(404, "Lot not found.");
+
+  const token = tokenFrom(request, body, "paddleToken", "x-paddle-token");
+  const tokenResult = await verifyToken(
+    token,
+    requireSecret(env),
+    { type: "paddle" }
+  );
+  if (!tokenResult.ok || tokenResult.payload.type !== "paddle") {
+    throw new ApiError(401, "Paddle authorization is invalid or expired.");
+  }
+  if (Number(tokenResult.payload.paddle) !== Number(row.winning_paddle)) {
+    throw new ApiError(403, "Only the winning paddle can verify this settlement.");
+  }
+
+  const publicLot = toPublicLot(row);
+  if (publicLot.status !== "settled" && publicLot.status !== "sold") {
+    throw new ApiError(409, "The lot is not settled yet.");
+  }
+
+  // Settled and verified earlier: replay the stored verdict.
+  if (row.settle_verified) {
+    return json({
+      ok: true,
+      settlement: settlementStateFor(row, SETTLE_STATE.VERIFIED)
+    });
+  }
+  if (row.tx_hash && (row.settle_failure || "").startsWith("rejected:")) {
+    return json({
+      ok: true,
+      settlement: settlementStateFor(row, SETTLE_STATE.REJECTED)
+    });
+  }
+  if (!row.tx_hash) {
+    return json({
+      ok: true,
+      settlement: { state: SETTLE_STATE.PENDING, reason: "No payment recorded yet." }
+    });
+  }
+
+  const result = await verifySettlement({
+    txHash: row.tx_hash,
+    hostAddress: row.host_address,
+    amountLunas: Number(row.winning_bid_lunas),
+    rpcUrl: rpcUrlForEnv(env)
+  });
+
+  if (result.status === SETTLE_STATE.VERIFIED) {
+    await database.prepare(
+      `UPDATE lots SET settle_verified = 1, settle_checked_at = ?, settle_failure = NULL WHERE id = ?`
+    ).bind(Date.now(), lotId).run();
+  } else if (result.status === SETTLE_STATE.REJECTED) {
+    await database.prepare(
+      `UPDATE lots SET settle_checked_at = ?, settle_failure = ? WHERE id = ?`
+    ).bind(Date.now(), `rejected:${result.reason}`, lotId).run();
+  }
+
+  const updated = { ...row, settle_checked_at: Date.now() };
+  return json({ ok: true, settlement: settlementStateFor(updated, result.status, result) });
+}
+
+function settlementStateFor(row, state, result) {
+  const failure = row.settle_failure || "";
+  return {
+    state,
+    txHash: row.tx_hash || null,
+    reason: state === SETTLE_STATE.REJECTED
+      ? failure.replace(/^rejected:/, "") || result?.reason || "Payment does not match."
+      : result?.reason || null,
+    confirmations: result?.confirmations ?? null,
+    checkedAt: Number(row.settle_checked_at) || null
+  };
 }
 
 async function getRoomState(request, env, lotId) {
@@ -571,7 +669,8 @@ async function selectLot(database, lotId) {
     `SELECT id, title, description, image_url, host_paddle, host_address,
             start_price_lunas, min_increment_lunas, duration_sec, status,
             scheduled_at, started_at, ended_at, winning_paddle,
-            winning_bid_lunas, tx_hash, created_at
+            winning_bid_lunas, tx_hash, created_at,
+            settle_verified, settle_checked_at, settle_failure
      FROM lots WHERE id = ?`
   ).bind(lotId).first();
 }
@@ -591,6 +690,11 @@ async function invokeRoom(request, env, lotId, suffix, options) {
 
 function settlementResponse(row) {
   const txHash = row.tx_hash;
+  const settleState = Number(row.settle_verified) === 1
+    ? SETTLE_STATE.VERIFIED
+    : (row.settle_failure || "").startsWith("rejected:")
+      ? SETTLE_STATE.REJECTED
+      : SETTLE_STATE.PENDING;
   return {
     ok: true,
     lot: toPublicLot(row),
@@ -598,7 +702,14 @@ function settlementResponse(row) {
       lotId: row.id,
       status: "settled",
       txHash,
-      explorerUrl: explorerUrl(txHash)
+      explorerUrl: explorerUrl(txHash),
+      settlement: {
+        state: settleState,
+        reason: settleState === SETTLE_STATE.REJECTED
+          ? String(row.settle_failure || "").replace(/^rejected:/, "")
+          : null,
+        checkedAt: Number(row.settle_checked_at) || null
+      }
     }
   };
 }
@@ -625,8 +736,24 @@ function toPublicLot(row) {
     winningPaddle: numberOrNull(row.winning_paddle ?? row.winningPaddle),
     winningBidLunas: numberOrNull(row.winning_bid_lunas ?? row.winningBidLunas),
     txHash: row.tx_hash ?? row.txHash ?? null,
+    settlement: settlementSummary(row),
     createdAt: numberOrNull(row.created_at ?? row.createdAt)
   };
+}
+
+function settlementSummary(row) {
+  const settled = row.status === "settled";
+  if (!settled && row.status !== "sold") return null;
+  if (!row.tx_hash && !settled) return null;
+
+  const verified = Number(row.settle_verified ?? 0) === 1;
+  const failure = String(row.settle_failure ?? "");
+  if (verified) return { state: SETTLE_STATE.VERIFIED };
+  if (failure.startsWith("rejected:")) {
+    return { state: SETTLE_STATE.REJECTED, reason: failure.slice("rejected:".length) };
+  }
+  if (!row.tx_hash) return null;
+  return { state: SETTLE_STATE.PENDING };
 }
 
 function toPublicBid(row) {

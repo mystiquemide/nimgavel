@@ -45,7 +45,7 @@ Single-writer authority for one lot. All bid validation and ordering happen here
 **Storage (DO SQLite) for restart safety:** latest snapshot of the above, written on every state change. On DO restart mid-auction, state restores and alarm re-arms.
 
 ### D1 (durable records)
-- `lots`: id TEXT PK, title, description, image_url, host_paddle INT, host_address TEXT, start_price_lunas INTEGER, min_increment_lunas INTEGER, duration_sec INT, status TEXT (created|live|sold|passed|settled), scheduled_at, started_at, ended_at, winning_paddle INT NULL, winning_bid_lunas INTEGER NULL, tx_hash TEXT NULL, created_at
+- `lots`: id TEXT PK, title, description, image_url, host_paddle INT, host_address TEXT, start_price_lunas INTEGER, min_increment_lunas INTEGER, duration_sec INT, status TEXT (created|live|sold|passed|settled), scheduled_at, started_at, ended_at, winning_paddle INT NULL, winning_bid_lunas INTEGER NULL, tx_hash TEXT NULL, created_at, settle_verified INT DEFAULT 0, settle_checked_at INT NULL, settle_failure TEXT NULL
 - `bids`: id INTEGER PK AUTOINCREMENT, lot_id TEXT, paddle INT, amount_lunas INTEGER, created_at
 - `paddles`: paddle INT PK, device_hash TEXT UNIQUE, alias TEXT, created_at, last_seen_at
 - `host_challenges`: id TEXT PK, host_address TEXT, message TEXT, issued_at INTEGER, expires_at INTEGER, used_at INTEGER NULL
@@ -104,16 +104,18 @@ Error codes: `outbid_increment`, `not_live`, `host_cannot_bid`, `rate_limited`, 
 | GET | /api/lots/:id | lot detail + bid history | none |
 | POST | /api/lots/:id/start | start auction (host token) | host token |
 | POST | /api/lots/:id/settle | record tx hash after winner pays | winner paddle token |
+| POST | /api/lots/:id/verify | on-chain payment check (winner paddle token) | winner paddle token |
 | GET | /api/rooms/:id/state | REST fallback for spectate polling | none |
 
-All JSON. Same-origin CORS policy with localhost dev exceptions (nimquest pattern).
+All JSON. Same-origin CORS policy with localhost dev exceptions (nimquest pattern). A scheduled handler (cron, every 10 minutes) re-checks settlements still marked `pending`.
 
 ## 6. Settlement flow
 
 1. DO closes auction → broadcasts `sold`, writes result to D1 (status sold).
-2. Winner UI shows amount due and Pay button → `nimiq.sendBasicTransaction({ recipient: hostAddress, value: lunas })` → native Nimiq Pay dialog.
-3. On tx result, app POSTs `/settle` with tx hash. Worker stores it, lot status `settled`, receipt screen shows hash + explorer link.
-4. P1 verification: worker queries public Nimiq JSON-RPC for the tx and confirms recipient + value match before accepting the hash. Until then the receipt is labeled "pending confirmation" if the tx is not yet known.
+2. Winner UI shows amount due and Pay button → `nimiq.sendBasicTransaction({ recipient: hostAddress, value: lunas })` → native Nimiq Pay dialog. The wallet returns the serialized transaction; the client derives the tx hash locally (blake2b-256 over the content serialization, `lib/tx-hash.js`, verified against @nimiq/core).
+3. On tx result, app POSTs `/settle` with tx hash. Worker stores it, lot status `settled`, settlement state `pending`.
+4. Verification (`worker/settle-verify.js`): the worker queries a public Nimiq JSON-RPC node (`getTransactionByHash`, mainnet `rpc.nimiqwatch.com` / testnet `rpc.testnet.nimiqwatch.com`, overridable via `NIMIQ_RPC_URL`) and marks the settlement `verified` only when the on-chain tx executed and paid exactly `winning_bid_lunas` to the host address. Any mismatch (wrong recipient, wrong amount, failed execution) marks it `rejected` with the reason. Unknown tx stays `pending`.
+5. Receipts show the settlement state (`pending` / `verified` / `rejected`) with the tx hash + explorer link. A cron pass every 10 minutes re-checks pending settlements so receipts converge without user action.
 No escrow, no custody. The app never touches keys or funds.
 
 ## 7. Identity and auth
