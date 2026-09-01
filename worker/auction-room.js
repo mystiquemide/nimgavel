@@ -7,6 +7,10 @@ const GOING_TWICE_MS = 15_000; // urgency window
 const BID_COOLDOWN_MS = 500; // per-paddle rate limit
 const MAX_BID_LUNAS = 1e12;
 const FEED_SIZE = 100;
+// Per-connection flood guard: valid bids are already limited to 2/s per
+// paddle, so anything beyond this rate is junk, close the connection.
+const MSG_CAP_WINDOW_MS = 10_000;
+const MSG_CAP_MAX = 100;
 
 const PHASES = ["created", "live", "going_once", "going_twice", "sold", "passed"];
 
@@ -250,7 +254,7 @@ export class AuctionRoom {
     const [client, server] = Object.values(pair);
     this.state.acceptWebSocket(server);
     server.serializeAttachment({ paddle, alias });
-    this.sessions.set(server, { paddle, alias, lastBidAt: 0 });
+    this.sessions.set(server, { paddle, alias, lastBidAt: 0, msgCount: 0, msgWindowStart: 0 });
 
     // Initial state to the new connection
     server.send(JSON.stringify(this.stateMessage()));
@@ -260,6 +264,9 @@ export class AuctionRoom {
   // Hibernation handlers: messages arrive here, surviving DO eviction.
   async webSocketMessage(server, data) {
     await this.load();
+
+    if (!this.withinMessageCap(server)) return;
+
     let msg;
     try {
       msg = JSON.parse(data);
@@ -284,6 +291,25 @@ export class AuctionRoom {
     this.sessions.delete(server);
   }
 
+  // Flood guard: counts every inbound frame per connection in a rolling
+  // window. Over the cap the connection is closed with 1008. Counters are
+  // in-memory; DO hibernation resets them, which only relaxes the guard.
+  withinMessageCap(server) {
+    const session = this.sessionFor(server);
+    const now = Date.now();
+    if (!session.msgWindowStart || now - session.msgWindowStart >= MSG_CAP_WINDOW_MS) {
+      session.msgWindowStart = now;
+      session.msgCount = 0;
+    }
+    session.msgCount = (session.msgCount || 0) + 1;
+    if (session.msgCount > MSG_CAP_MAX) {
+      this.sessions.delete(server);
+      try { server.close(1008, "Message cap exceeded."); } catch {}
+      return false;
+    }
+    return true;
+  }
+
   sessionFor(ws) {
     if (!this.sessions.has(ws)) {
       let att = {};
@@ -294,6 +320,8 @@ export class AuctionRoom {
         paddle: att.paddle ?? 0,
         alias: att.alias || "Paddle",
         lastBidAt: 0,
+        msgCount: 0,
+        msgWindowStart: 0,
       });
     }
     return this.sessions.get(ws);

@@ -188,6 +188,9 @@ async function getOrCreatePaddle(request, env, url) {
 
   const database = requireDb(env);
   const secret = requireSecret(env);
+  const ip = requestIp(request);
+  if (ip) await throttlePaddleIp(database, ip);
+
   const deviceHash = await sha256Hex(deviceId.trim());
   const now = Date.now();
   const paddleRecord = await findOrCreatePaddle(database, deviceHash, now);
@@ -204,6 +207,55 @@ async function getOrCreatePaddle(request, env, url) {
     paddleToken,
     expiresAt: new Date(now + PADDLE_TOKEN_TTL_MS).toISOString()
   });
+}
+
+const PADDLE_IP_WINDOW_MS = 60 * 60 * 1000;
+const PADDLE_IP_MAX = 10;
+const PADDLE_LOG_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+// Cloudflare sets CF-Connecting-IP on every production request and strips
+// client-supplied copies, so it cannot be spoofed there. Loopback and
+// private ranges only occur in local dev (wrangler injects 127.0.0.1):
+// exempt them so dev traffic shares no bucket.
+function requestIp(request) {
+  const ip = request.headers.get("cf-connecting-ip");
+  if (!ip || !/^[0-9a-fA-F.:]{3,45}$/.test(ip)) return null;
+  return isRoutableIp(ip) ? ip : null;
+}
+
+function isRoutableIp(ip) {
+  const value = ip.toLowerCase();
+  if (value === "::1" || value === "::" || value === "0.0.0.0") return false;
+  if (value.startsWith("fc") || value.startsWith("fd") || value.startsWith("fe80")) return false;
+  if (/^127\./.test(value)) return false;
+  if (/^10\./.test(value)) return false;
+  if (/^192\.168\./.test(value)) return false;
+  const match = value.match(/^172\.(\d+)\./);
+  if (match) {
+    const second = Number(match[1]);
+    if (second >= 16 && second <= 31) return false;
+  }
+  return true;
+}
+
+async function throttlePaddleIp(database, ip) {
+  const now = Date.now();
+  await database.prepare(
+    "INSERT INTO paddle_requests (ip, created_at) VALUES (?, ?)"
+  ).bind(ip, now).run();
+
+  if (Math.random() < 0.125) {
+    await database.prepare(
+      "DELETE FROM paddle_requests WHERE created_at < ?"
+    ).bind(now - PADDLE_LOG_RETENTION_MS).run();
+  }
+
+  const counted = await database.prepare(
+    "SELECT COUNT(*) AS n FROM paddle_requests WHERE ip = ? AND created_at > ?"
+  ).bind(ip, now - PADDLE_IP_WINDOW_MS).first();
+  if (Number(counted?.n || 0) > PADDLE_IP_MAX) {
+    throw new ApiError(429, "Too many paddles from this network. Try again later.");
+  }
 }
 
 async function findOrCreatePaddle(database, deviceHash, now) {
