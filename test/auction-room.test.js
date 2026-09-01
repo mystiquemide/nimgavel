@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const BASE = process.env.WRANGLER_URL || "http://127.0.0.1:8787";
+const BASE = process.env.WRANGLER_URL || "http://127.0.0.1:8799";
 const WS_BASE = BASE.replace(/^http/, "ws");
 const RUN = process.env.TEST_RUN || String(Date.now()).slice(-6);
 const LOT = {

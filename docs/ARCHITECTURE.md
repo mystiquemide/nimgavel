@@ -48,6 +48,7 @@ Single-writer authority for one lot. All bid validation and ordering happen here
 - `lots`: id TEXT PK, title, description, image_url, host_paddle INT, host_address TEXT, start_price_lunas INTEGER, min_increment_lunas INTEGER, duration_sec INT, status TEXT (created|live|sold|passed|settled), scheduled_at, started_at, ended_at, winning_paddle INT NULL, winning_bid_lunas INTEGER NULL, tx_hash TEXT NULL, created_at
 - `bids`: id INTEGER PK AUTOINCREMENT, lot_id TEXT, paddle INT, amount_lunas INTEGER, created_at
 - `paddles`: paddle INT PK, device_hash TEXT UNIQUE, alias TEXT, created_at, last_seen_at
+- `host_challenges`: id TEXT PK, host_address TEXT, message TEXT, issued_at INTEGER, expires_at INTEGER, used_at INTEGER NULL
 - `lot_results` (view over lots where status in sold|settled) for the archive and results ticker.
 
 ## 3. Auction state machine
@@ -120,6 +121,8 @@ No escrow, no custody. The app never touches keys or funds.
 **Paddle (bidder):** client calls `requestDeviceIdentifier()` (native consent on first use), sends the id to `/api/paddle`. Worker stores `sha256(deviceId)` in D1, assigns the next sequential paddle number, generates a stable alias from the hash (adjective + animal). Issues `paddleToken = HMAC-SHA256(workerSecret, paddle + deviceHash + exp)` (24h). The DO verifies tokens on join. One connection per paddle per room.
 
 **Host:** payout address is the identity anchor. Lot creation: worker returns a challenge, host signs with `nimiq.sign()` using the wallet that owns the payout address, worker verifies signature against the address (same challenge-store pattern NimQuest proved). Host token issued for lot control (start).
+
+The Worker signs paddle and host-control tokens with the `NIMGAVEL_SECRET` secret. Tokens are stateless and expire after 24 hours. Host challenges are one-time D1 records and expire after five minutes.
 
 Device ids are pseudonymous and client-attested only; acceptable threat trade for a community app, mitigated by rate limits and server-side paddle assignment. Host control is wallet-grade because money flows to that address.
 

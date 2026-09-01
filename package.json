@@ -12,7 +12,7 @@
     "deploy": "npm run build:web && wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply nimgavel --local",
     "db:migrate:remote": "wrangler d1 migrations apply nimgavel --remote",
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js",
     "log": "node scripts/session-log.mjs",
     "setup-hooks": "./scripts/setup-hooks.sh",
     "worker:check": "npm run build:web && wrangler deploy --dry-run"
@@ -22,6 +22,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@noble/hashes": "^2.0.1",
     "@nimiq/core": "^2.7.1",
     "@nimiq/mini-app-sdk": "^0.1.0"
   },
