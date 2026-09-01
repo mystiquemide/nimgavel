@@ -20,6 +20,7 @@ export class AuctionRoom {
     this.env = env;
     this.sessions = new Map(); // webSocket -> { paddle, alias, lastBidAt }
     this.loaded = false;
+    this.finalized = false;
   }
 
   // ---------- persistence ----------
@@ -35,6 +36,7 @@ export class AuctionRoom {
       this.leading = stored.leading; // { paddle, alias } | null
       this.bidLog = stored.bidLog || [];
       this.startedAt = stored.startedAt;
+      this.finalized = Boolean(stored.finalized);
     } else {
       this.lot = null;
       this.phase = "created";
@@ -43,6 +45,7 @@ export class AuctionRoom {
       this.leading = null;
       this.bidLog = [];
       this.startedAt = null;
+      this.finalized = false;
     }
     this.loaded = true;
   }
@@ -56,6 +59,7 @@ export class AuctionRoom {
       leading: this.leading,
       bidLog: this.bidLog,
       startedAt: this.startedAt,
+      finalized: this.finalized,
     });
   }
 
@@ -119,21 +123,26 @@ export class AuctionRoom {
     if (!this.lot) return;
 
     if (this.phase === "sold" || this.phase === "passed") {
-      // Finalization path: persist result once, then stop.
+      // Finalization path: persist the flag first so a crash mid-finalize
+      // never repeats the D1 writes; the gavel falls even if D1 hiccups.
       if (!this.finalized) {
         this.finalized = true;
-        await this.persistToD1({
-          status: this.phase,
-          endedAt: now,
-          winningPaddle: this.phase === "sold" ? this.leading?.paddle ?? null : null,
-          winningBidLunas: this.phase === "sold" ? this.currentBid : null,
-        });
+        await this.save();
+        try {
+          await this.persistToD1({
+            status: this.phase,
+            endedAt: now,
+            winningPaddle: this.phase === "sold" ? this.leading?.paddle ?? null : null,
+            winningBidLunas: this.phase === "sold" ? this.currentBid : null,
+          });
+        } catch (e) {
+          console.error("nimgavel: finalization D1 write failed", e);
+        }
         this.broadcast(
           this.phase === "sold"
             ? { type: "sold", winningPaddle: this.leading.paddle, alias: this.leading.alias, amountLunas: this.currentBid, hostAddress: this.lot.hostAddress }
             : { type: "passed", reason: "no bids" }
         );
-        await this.save();
       }
       return;
     }
@@ -187,8 +196,9 @@ export class AuctionRoom {
     const prevPhase = this.phase;
     this.currentBid = amountLunas;
     this.leading = { paddle, alias };
+    // Full bid history: the WS feed slices to FEED_SIZE for clients, but
+    // the DO log and D1 archive keep every bid of the war.
     this.bidLog.push({ paddle, alias, amountLunas, ts: now });
-    if (this.bidLog.length > FEED_SIZE) this.bidLog.shift();
 
     // Soft close: any valid bid inside the final 30s extends by 30s
     if (this.endsAt - now <= SOFT_CLOSE_MS) {
@@ -384,10 +394,11 @@ export class AuctionRoom {
     await this.env.DB.prepare(`UPDATE lots SET ${sets.join(", ")} WHERE id = ?`).bind(...args).run();
 
     if (patch.status === "sold" || patch.status === "passed") {
-      // Best effort bid log persistence
-      const rows = this.bidLog.slice(-FEED_SIZE).map((b) => [this.lot.id, b.paddle, b.amountLunas, b.ts]);
+      // Idempotent: re-finalization after a crash must not duplicate rows.
+      // The full log, not the feed slice: the archive must hold every bid.
+      const rows = this.bidLog.map((b) => [this.lot.id, b.paddle, b.amountLunas, b.ts]);
       if (rows.length) {
-        const stmt = this.env.DB.prepare("INSERT INTO bids (lot_id, paddle, amount_lunas, created_at) VALUES (?, ?, ?, ?)");
+        const stmt = this.env.DB.prepare("INSERT OR IGNORE INTO bids (lot_id, paddle, amount_lunas, created_at) VALUES (?, ?, ?, ?)");
         await this.env.DB.batch(rows.map((r) => stmt.bind(...r)));
       }
     }
