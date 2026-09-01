@@ -159,6 +159,7 @@ async function health(env) {
     app: "nimgavel",
     buildId: env.BUILD_ID || "local",
     db: dbOk,
+    network: env.NIMIQ_NETWORK || "testnet",
     ts: Date.now()
   }, dbOk ? 200 : 503);
 }
