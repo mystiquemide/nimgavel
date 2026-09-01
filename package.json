@@ -1,0 +1,31 @@
+{
+  "name": "nimgavel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Live community auction house for Nimiq Pay. Going once. Going twice. NIM.",
+  "type": "module",
+  "scripts": {
+    "dev:web": "vite --host 0.0.0.0",
+    "dev:worker": "wrangler dev",
+    "build:web": "vite build",
+    "preview:web": "vite preview --host 0.0.0.0",
+    "deploy": "npm run build:web && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply nimgavel --local",
+    "db:migrate:remote": "wrangler d1 migrations apply nimgavel --remote",
+    "test": "node --test test/",
+    "worker:check": "npm run build:web && wrangler deploy --dry-run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@nimiq/core": "^2.7.1",
+    "@nimiq/mini-app-sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260728.1",
+    "vite": "^7.1.2",
+    "wrangler": "^4.40.0"
+  }
+}
