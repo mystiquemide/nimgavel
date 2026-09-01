@@ -13,6 +13,8 @@
     "db:migrate:local": "wrangler d1 migrations apply nimgavel --local",
     "db:migrate:remote": "wrangler d1 migrations apply nimgavel --remote",
     "test": "node --test test/",
+    "log": "node scripts/session-log.mjs",
+    "setup-hooks": "./scripts/setup-hooks.sh",
     "worker:check": "npm run build:web && wrangler deploy --dry-run"
   },
   "engines": {
