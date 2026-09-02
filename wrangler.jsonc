@@ -13,7 +13,7 @@
     {
       "binding": "DB",
       "database_name": "nimgavel",
-      "database_id": "SET_AT_DEPLOY",
+      "database_id": "7822a65b-8cfb-4ab8-bc5b-33da6d027999",
       "migrations_dir": "./migrations"
     }
   ],
