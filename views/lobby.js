@@ -45,11 +45,11 @@ export function renderLobby(container, { navigate }) {
 
   function renderWalletArea() {
     if (isSpectate()) {
-      const appUrl = encodeURIComponent(location.origin + "/lobby");
+      
       spectateSlot.innerHTML = `
         <div class="spectate-bar">
           <span>Watching from a plain browser.</span>
-          <a href="https://nimpay.app/miniapps/open/${appUrl}">Open in Nimiq Pay</a>
+          <a href="nimiqpay://miniapp?url=${encodeURIComponent("https://nimgavel.artistic-chip.workers.dev/lobby")}">Open in Nimiq Pay</a>
         </div>
       `;
       walletSlot.innerHTML = "";
@@ -147,9 +147,9 @@ export function renderLobby(container, { navigate }) {
     }
 
     if (isSpectate()) {
-      const appUrl = encodeURIComponent(location.origin + "/lobby");
+      
       sections.push(`
-        <a class="btn full" style="margin-top:12px" href="https://nimpay.app/miniapps/open/${appUrl}">Bid from Nimiq Pay →</a>
+        <a class="btn full" style="margin-top:12px" href="nimiqpay://miniapp?url=${encodeURIComponent("https://nimgavel.artistic-chip.workers.dev/lobby")}">Bid from Nimiq Pay →</a>
       `);
     }
 

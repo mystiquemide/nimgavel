@@ -132,6 +132,7 @@ export function renderRoom(container, { navigate, params }) {
       ${closed ? "" : `
       <div class="bid-block">
         <div class="current-bid">
+          <div class="bid-label mono">CURRENT BID</div>
           <div class="amount">${formatNim(state.currentBid || 0)}<span class="unit">NIM</span></div>
           <div class="leading">${leadingChip}</div>
         </div>
@@ -195,7 +196,9 @@ export function renderRoom(container, { navigate, params }) {
     if (isSpectate()) {
       ctaSlot.innerHTML = `
         <div class="sticky-cta">
-          <div class="cta-note">Spectating. Bidding needs Nimiq Pay.</div>
+          <div class="cta-note">Spectator mode. Bidding runs inside Nimiq Pay.</div>
+          <a class="btn full" href="nimiqpay://miniapp?url=${encodeURIComponent("https://nimgavel.artistic-chip.workers.dev/room/" + lotId)}">Open in Nimiq Pay to bid</a>
+          <div class="cta-note" style="padding-top:8px"><a href="/lobby">← back to the lobby</a></div>
         </div>`;
       return;
     }

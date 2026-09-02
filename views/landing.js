@@ -4,8 +4,13 @@ import { listLots, getRoomState, ApiError } from "../lib/api.js";
 import { formatNim } from "../lib/nimiq.js";
 import { escapeHtml, escapeAttr } from "./room.js";
 
-const payDeeplink = () =>
-  `https://nimpay.app/miniapps/open/${encodeURIComponent(location.origin + "/")}`;
+// The HTTPS directory link (nimpay.app/miniapps/open/) 404s for unlisted
+// hosts — verified live, even for known apps. The nimiqpay:// custom scheme
+// is the documented path (nimiq.dev/mini-apps): opens the app inside
+// Nimiq Pay, with a one-time warning for unlisted hosts.
+const APP_ORIGIN = "https://nimgavel.artistic-chip.workers.dev";
+const payDeeplink = (path = "/") =>
+  `nimiqpay://miniapp?url=${encodeURIComponent(APP_ORIGIN + path)}`;
 
 export function renderLanding(container, { navigate }) {
   const state = { lots: null, room: null, roomTimer: null };
@@ -32,7 +37,7 @@ export function renderLanding(container, { navigate }) {
           <a class="btn full" href="${payDeeplink()}">Open in Nimiq Pay →</a>
           <button class="btn secondary full" id="watch-live">Watch a live auction</button>
         </div>
-        <div class="proof-note settle" style="animation-delay:320ms">Settlements verified on-chain. Every bid and payout is public.</div>
+        <div class="proof-note settle" style="animation-delay:320ms">A mini app that runs inside Nimiq Pay, the Nimiq wallet. Settlements verified on-chain.</div>
       </section>
 
       <section class="landing-live">

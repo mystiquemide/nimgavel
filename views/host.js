@@ -36,11 +36,10 @@ export function renderHost(container, { navigate }) {
 
   function renderWalletGate() {
     if (isSpectate()) {
-      const appUrl = encodeURIComponent(location.origin + "/host");
       walletSlot.innerHTML = `
         <div class="wallet-row">
           Hosting needs Nimiq Pay.
-          <a href="https://nimpay.app/miniapps/open/${appUrl}">Open in Nimiq Pay</a>
+          <a href="nimiqpay://miniapp?url=${encodeURIComponent("https://nimgavel.artistic-chip.workers.dev/host")}">Open in Nimiq Pay</a>
         </div>`;
       return;
     }
@@ -107,7 +106,7 @@ export function renderHost(container, { navigate }) {
   function renderShareSheet() {
     const lot = state.shareLot;
     const roomUrl = `${location.origin}/room/${lot.id}`;
-    const deeplink = `https://nimpay.app/miniapps/open/${encodeURIComponent(roomUrl)}`;
+    const deeplink = `nimiqpay://miniapp?url=${encodeURIComponent(roomUrl)}`;
     return `
       <div class="card share-card" id="share-sheet">
         <div class="share-title">Lot created. Bring bidders in.</div>
