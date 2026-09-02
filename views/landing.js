@@ -117,7 +117,7 @@ export function renderLanding(container, { navigate }) {
       return;
     }
     slot.innerHTML = results.slice(0, 3).map((lot) => `
-      <div class="card lot-card" style="margin-bottom:8px">
+      <div class="card lot-card" style="margin-bottom:8px" data-enter="${escapeAttr(lot.id)}" role="button" tabindex="0" aria-label="${escapeAttr(lot.title)}, sold for ${formatNim(lot.winningBidLunas ?? 0)} NIM">
         <img class="thumb" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
         <div class="lot-body">
           <div class="lot-title">${escapeHtml(lot.title)}</div>
@@ -128,6 +128,12 @@ export function renderLanding(container, { navigate }) {
         </div>
       </div>
     `).join("");
+    slot.querySelectorAll("[data-enter]").forEach((el) => {
+      el.addEventListener("click", () => navigate(`/room/${el.dataset.enter}`));
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") navigate(`/room/${el.dataset.enter}`);
+      });
+    });
   }
 
   function renderLive() {

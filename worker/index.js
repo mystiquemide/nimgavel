@@ -768,7 +768,7 @@ function settlementResponse(row) {
 }
 
 function explorerUrl(txHash) {
-  return `https://nimiq.watch/transaction/${encodeURIComponent(txHash)}`;
+  return `https://nimiq.watch/#${encodeURIComponent(txHash)}`;
 }
 
 function toPublicLot(row) {

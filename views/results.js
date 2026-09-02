@@ -45,7 +45,7 @@ export function renderResults(container, { navigate }) {
             ? `<span class="settle-chip pending shimmer">checking…</span>`
             : "";
       const tx = lot.txHash
-        ? `<a class="mono" style="font-size:11px" href="https://nimiq.watch/transaction/${escapeAttr(lot.txHash)}" target="_blank" rel="noreferrer">${shortHash(lot.txHash)} →</a>`
+        ? `<a class="mono" style="font-size:11px" href="https://nimiq.watch/#${escapeAttr(lot.txHash)}" target="_blank" rel="noreferrer">${shortHash(lot.txHash)} →</a>`
         : "";
       return `
         <div class="arch-row" data-enter="${escapeAttr(lot.id)}" role="button" aria-label="${escapeAttr(lot.title)}, sold for ${formatNim(lot.winningBidLunas ?? 0)} NIM">

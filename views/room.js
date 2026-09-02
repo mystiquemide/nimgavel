@@ -44,11 +44,12 @@ export function renderRoom(container, { navigate, params }) {
 
   container.innerHTML = `
     <div class="slam-flash" id="slam-flash"></div>
-    <div class="room-banner" id="room-banner" data-phase="created" aria-live="polite">
+    <header class="room-banner" id="room-banner" data-phase="created" aria-live="polite">
+      <a class="room-back" href="/lobby" aria-label="Back to the lobby">←</a>
       <span class="phase-text" id="phase-text">CONNECTING</span>
       <span class="conn" id="conn-text"></span>
-    </div>
-    <div id="room-body"><div class="skeleton">entering the room…</div></div>
+    </header>
+    <main id="room-body"><div class="skeleton">entering the room…</div></main>
     <div id="cta-slot"></div>
   `;
 
@@ -133,7 +134,7 @@ export function renderRoom(container, { navigate, params }) {
       <div class="bid-block">
         <div class="current-bid">
           <div class="bid-label mono">CURRENT BID</div>
-          <div class="amount">${formatNim(state.currentBid || 0)}<span class="unit">NIM</span></div>
+          <div class="amount">${formatNim(state.currentBid || 0)} <span class="unit">NIM</span></div>
           <div class="leading">${leadingChip}</div>
         </div>
         ${countdownHtml}
@@ -439,7 +440,7 @@ export function renderRoom(container, { navigate, params }) {
             state.settled = true;
             state.receipt = {
               txHash: detail.lot.txHash,
-              explorerUrl: `https://nimiq.watch/transaction/${detail.lot.txHash}`,
+              explorerUrl: `https://nimiq.watch/#${detail.lot.txHash}`,
               settlement: detail.lot.settlement || { state: "pending" }
             };
           }
