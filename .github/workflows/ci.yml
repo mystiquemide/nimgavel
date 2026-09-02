@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build:web
+
+      - name: Start local worker
+        run: |
+          npx wrangler d1 migrations apply nimgavel --local
+          nohup npx wrangler dev --port 8799 > /tmp/wrangler.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8799/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8799/health
+
+      - name: Run test suite
+        env:
+          WRANGLER_URL: http://127.0.0.1:8799
+        run: node --test --test-timeout=180000 test/*.test.js
+
+      - name: Worker deploy dry-run
+        run: npm run worker:check
+
+      - name: Dependency audit
+        run: npm audit --omit=dev
+
+      - name: Bundle hygiene
+        run: |
+          if grep -q "reviewWallet" dist/assets/index-*.js; then
+            echo "::error::dev-only reviewWallet hook leaked into the production bundle"
+            exit 1
+          fi

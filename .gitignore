@@ -6,3 +6,9 @@ dist/
 *.log
 .dev.vars
 .qwen/
+memory.md
+.githooks/
+scripts/session-log.mjs
+scripts/setup-hooks.sh
+docs/PRD.md
+docs/TASKS.md
