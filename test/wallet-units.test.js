@@ -51,7 +51,8 @@ test("formatNim renders compact auction prices", () => {
 });
 
 test("wallet module exposes state and cancel error without touching window", () => {
-  assert.equal(getWalletState(), "connecting");
+  // No window.nimiq in Node: module-level sync detection reports spectate.
+  assert.equal(getWalletState(), "spectate");
   const cancel = new WalletCancelledError();
   assert.equal(cancel.name, "WalletCancelledError");
   assert.equal(cancel.message, "The wallet request was cancelled.");
