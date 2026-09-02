@@ -23,6 +23,9 @@ jobs:
 
       - name: Start local worker
         run: |
+          # The worker returns 503 without an auth secret; CI generates one.
+          # NIMIQ_RPC_URL points settlement tests at the in-suite mock RPC.
+          printf 'NIMGAVEL_SECRET=ci-only-secret-0123456789abcdef\nNIMIQ_RPC_URL=http://127.0.0.1:8899\n' > .dev.vars
           npx wrangler d1 migrations apply nimgavel --local
           nohup npx wrangler dev --port 8799 > /tmp/wrangler.log 2>&1 &
           for i in $(seq 1 60); do
