@@ -14,6 +14,9 @@
   --red-tint: rgba(255, 93, 110, 0.08);
   --red-border: rgba(255, 93, 110, 0.3);
 
+  /* Shell measure: fluid like NimQuest, capped on desktop. */
+  --max: 1180px;
+
   --font-display: "Space Grotesk", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -66,13 +69,13 @@ html, body {
   padding: 0 16px;
 }
 
+/* Tablet: the frame breathes. Desktop: full NimQuest-style shell. */
 @media (min-width: 560px) {
-  #app { border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+  #app { max-width: 720px; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 }
 
-/* Desktop: same floor, more room. Cards stretch, the landing composes. */
 @media (min-width: 900px) {
-  #app { max-width: 840px; padding: 0 24px; }
+  #app { max-width: var(--max); padding: 0 24px; }
 }
 
 a { color: var(--gold); text-decoration: none; }
@@ -549,3 +552,49 @@ button { font-family: inherit; }
 .dead-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 
 .wallet-row a { display: inline-flex; align-items: center; min-height: 44px; }
+
+/* ===== Wide-shell layouts (≥900px, NimQuest-style) =====
+   Placed last: wins the cascade over the single-column base rules above. */
+@media (min-width: 900px) {
+  /* Full-bleed strips escape the 24px shell padding. */
+  .room-banner { margin: 0 -24px; padding: 0 20px 0 4px; }
+  .spectate-bar { margin: 12px -24px 0; padding: 7px 24px; }
+  .landing-header { margin: 0 -24px; padding: 18px 24px 0; }
+
+  /* Lobby: live floor on the left, the results ledger on the right. */
+  .lobby-main {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 0 48px;
+    align-items: start;
+  }
+
+  /* Host: the form keeps a working measure; My Lots gets its own rail. */
+  #host-main {
+    display: grid;
+    grid-template-columns: minmax(0, 640px) minmax(0, 1fr);
+    gap: 0 48px;
+    align-items: start;
+  }
+
+  /* Results ledger reads as a wall of proof, two cards across. */
+  #results-main {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  #results-main .section-label,
+  #results-main .footer-space { grid-column: 1 / -1; }
+  #results-main .arch-row { margin-bottom: 0; }
+
+  /* The room is a checkout: keep the bidding focused, banner spans the shell. */
+  #room-body, #cta-slot {
+    width: 100%;
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Sticky CTA aligns to the 760px room body; no mobile edge bleed needed. */
+  .sticky-cta { margin: 0; padding: 10px 0 calc(10px + env(safe-area-inset-bottom)); }
+}

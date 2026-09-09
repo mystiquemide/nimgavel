@@ -94,9 +94,11 @@ export function renderHost(container, { navigate }) {
         ${state.formError ? `<div class="form-error" role="alert">${escapeHtml(state.formError)}</div>` : ""}
         ${state.justCreated ? `<div class="form-success">Lot created. Start it below.</div>` : ""}
       </form>
-      ${state.shareLot ? renderShareSheet() : ""}
-      <div class="section-label">MY LOTS</div>
-      <div id="my-lots"></div>
+      <aside class="host-side">
+        ${state.shareLot ? renderShareSheet() : ""}
+        <div class="section-label">MY LOTS</div>
+        <div id="my-lots"></div>
+      </aside>
     `;
 
     main.querySelector("#lot-form").addEventListener("submit", onCreate);

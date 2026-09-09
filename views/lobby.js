@@ -103,14 +103,15 @@ export function renderLobby(container, { navigate }) {
       return;
     }
 
-    const sections = [];
+    const left = [];
+    const right = [];
 
     if (live.length) {
       const lot = live[0];
       const room = state.roomState;
       const bid = room?.currentBidLunas ?? lot.startPriceLunas ?? 0;
       const remaining = roomRemaining(room);
-      sections.push(`
+      left.push(`
         <div class="section-label live"><span class="live-dot"></span>LIVE</div>
         <div class="card lot-card">
           <img class="thumb" loading="lazy" decoding="async" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
@@ -129,7 +130,7 @@ export function renderLobby(container, { navigate }) {
 
     if (upcoming.length) {
       const lot = upcoming[0];
-      sections.push(`
+      left.push(`
         <div class="section-label">NEXT${lot.scheduledAt ? ` · ${formatSchedule(lot.scheduledAt)}` : ""}</div>
         <div class="card lot-card">
           <img class="thumb" loading="lazy" decoding="async" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
@@ -142,21 +143,21 @@ export function renderLobby(container, { navigate }) {
     }
 
     if (!isSpectate() && walletReady()) {
-      sections.push(`
+      left.push(`
         <button class="btn secondary full" style="margin-top:12px" id="lobby-host">Host a lot</button>
       `);
     }
 
     if (isSpectate()) {
-      
-      sections.push(`
+
+      left.push(`
         <a class="btn full" style="margin-top:12px" href="nimiqpay://miniapp?url=${encodeURIComponent("https://nimgavel.artistic-chip.workers.dev/lobby")}">Bid from Nimiq Pay →</a>
       `);
     }
 
     if (results.length) {
       const rows = results.slice(0, 5).map((lot) => `
-        <div class="card lot-card" style="margin-bottom:8px" data-enter="${escapeAttr(lot.id)}" role="button" aria-label="${escapeAttr(lot.title)}, sold for ${formatNim(lot.winningBidLunas ?? 0)} NIM">
+        <div class="card lot-card" style="margin-bottom:8px" data-enter="${escapeAttr(lot.id)}" role="button" tabindex="0" aria-label="${escapeAttr(lot.title)}, sold for ${formatNim(lot.winningBidLunas ?? 0)} NIM">
           <img class="thumb" loading="lazy" decoding="async" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
           <div class="lot-body">
             <div class="lot-title">${escapeHtml(lot.title)}</div>
@@ -166,16 +167,24 @@ export function renderLobby(container, { navigate }) {
           </div>
         </div>
       `).join("");
-      sections.push(`
+      right.push(`
         <div class="section-label">RECENT RESULTS <a href="/results" style="margin-left:auto;font-size:11px;padding:6px 0">all results →</a></div>
         ${rows}
       `);
     }
 
-    main.innerHTML = sections.join("");
+    // Desktop: live floor on the left rail, results ledger on the right;
+    // mobile: one stacked column in the same order as before.
+    main.innerHTML = `
+      <div class="lobby-left">${left.join("")}</div>
+      <div class="lobby-right">${right.join("")}</div>
+    `;
 
     main.querySelectorAll("[data-enter]").forEach((el) => {
       el.addEventListener("click", () => navigate(`/room/${el.dataset.enter}`));
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") navigate(`/room/${el.dataset.enter}`);
+      });
     });
     const hostButton = main.querySelector("#lobby-host");
     if (hostButton) hostButton.addEventListener("click", () => navigate("/host"));
