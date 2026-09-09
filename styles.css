@@ -70,8 +70,26 @@ html, body {
   #app { border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 }
 
+/* Desktop: same floor, more room. Cards stretch, the landing composes. */
+@media (min-width: 900px) {
+  #app { max-width: 840px; padding: 0 24px; }
+}
+
 a { color: var(--gold); text-decoration: none; }
 button { font-family: inherit; }
+
+/* Keyboard users get a visible gold ring; touch/pointer stays clean. */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* Skip link: hidden until focused, first stop for keyboard users. */
+.skip-link {
+  position: absolute; left: 8px; top: -48px; z-index: 60;
+  background: var(--gold); color: var(--bg);
+  font-family: var(--font-display); font-weight: 700; font-size: 13px;
+  padding: 10px 16px; border-radius: 0 0 8px 8px;
+  transition: top var(--dur-micro) var(--ease-out-quad);
+}
+.skip-link:focus { top: 0; }
 
 .num { font-variant-numeric: tabular-nums; }
 .mono { font-family: var(--font-mono); font-size: 12px; }
@@ -297,6 +315,35 @@ button { font-family: inherit; }
 .landing-final { text-align: center; padding: 32px 0 20px; }
 .landing-final h2 { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -0.5px; margin: 0 0 14px; }
 
+/* Desktop landing: hero on the left, the live floor on the right. */
+@media (min-width: 900px) {
+  .landing > main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 44px;
+    align-items: start;
+  }
+  .landing-hero {
+    grid-column: 1; grid-row: 1 / span 2;
+    margin: 0 -24px; padding: 56px 24px 40px;
+  }
+  .landing-hero h1 { font-size: 56px; }
+  .landing-live { grid-column: 2; }
+  #landing-results { grid-column: 2; }
+  .landing-steps {
+    grid-column: 1 / -1;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 28px;
+  }
+  .trust-strip { grid-column: 1 / -1; }
+  .landing-final {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; justify-content: space-between;
+    text-align: left; gap: 24px;
+  }
+  .landing-final h2 { margin: 0; flex: none; }
+  .landing-final .btn { max-width: 320px; margin-left: auto; }
+}
+
 .landing-footer {
   margin-top: auto; padding: 12px 0 16px;
   color: var(--text-dim); font-size: 12px;
@@ -339,6 +386,15 @@ button { font-family: inherit; }
 .app-header img { width: 28px; height: 28px; display: block; }
 .app-header .brand { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: 0.04em; }
 .app-header .tagline { margin-left: auto; color: var(--text-dim); font-size: 11px; text-align: right; }
+.header-back {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; min-width: 44px; margin-left: -8px;
+  color: var(--text-dim); font-size: 18px;
+}
+.header-back:hover { color: var(--text); }
+
+.quiet-card { padding: 18px 16px; }
+.quiet-card .btn { justify-content: center; }
 
 .wallet-row {
   margin: 12px 0; padding: 12px 14px;
@@ -461,6 +517,25 @@ button { font-family: inherit; }
 .arch-row .arch-title { font-family: var(--font-display); font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .arch-row .arch-meta { color: var(--text-dim); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .arch-row .arch-price { color: var(--gold); font-weight: 600; }
+.arch-reason { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin-top: 6px; max-width: 46ch; }
+
+/* Transaction proof row: labeled, linked, copyable (audit MED-3). */
+.tx-row { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+.tx-link {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px; padding: 0 8px 0 0;
+}
+.tx-link .mono { color: var(--text-dim); }
+.tx-link:hover .mono { color: var(--text); }
+.tx-action { font-family: var(--font-mono); font-size: 11px; color: var(--gold); white-space: nowrap; }
+.copy-hash {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 0 10px;
+  background: none; border: 1px solid var(--border); border-radius: var(--radius-control);
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+  cursor: pointer;
+}
+.copy-hash:hover { color: var(--text); border-color: var(--text-dim); }
 
 .share-card { text-align: center; padding: 20px 16px; }
 .share-title { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.3px; margin-bottom: 14px; }
@@ -469,7 +544,8 @@ button { font-family: inherit; }
 .qr-slot img, .qr-slot canvas { width: 100%; height: 100%; display: block; }
 
 .dead-end { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 56px 24px; text-align: center; }
-.dead-end .dead-title { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.3px; }
+.dead-end .dead-title { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.3px; margin: 0; }
 .dead-end .dead-sub { color: var(--text-dim); font-size: 14px; line-height: 1.55; max-width: 30ch; }
+.dead-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 
 .wallet-row a { display: inline-flex; align-items: center; min-height: 44px; }

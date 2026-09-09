@@ -21,6 +21,7 @@ export function renderLobby(container, { navigate }) {
 
   container.innerHTML = `
     <header class="app-header">
+      <a class="header-back" href="/" aria-label="Back to the front page">←</a>
       <img src="/favicon.svg" alt="Nimgavel" width="28" height="28" />
       <h1 class="brand">NIMGAVEL</h1>
       <span class="tagline">Going once.<br/>Going twice. NIM.</span>
@@ -112,7 +113,7 @@ export function renderLobby(container, { navigate }) {
       sections.push(`
         <div class="section-label live"><span class="live-dot"></span>LIVE</div>
         <div class="card lot-card">
-          <img class="thumb" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
+          <img class="thumb" loading="lazy" decoding="async" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
           <div class="lot-body">
             <h2 class="lot-title">${escapeHtml(lot.title)}</h2>
             <div class="lot-meta num">
@@ -131,7 +132,7 @@ export function renderLobby(container, { navigate }) {
       sections.push(`
         <div class="section-label">NEXT${lot.scheduledAt ? ` · ${formatSchedule(lot.scheduledAt)}` : ""}</div>
         <div class="card lot-card">
-          <img class="thumb" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
+          <img class="thumb" loading="lazy" decoding="async" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
           <div class="lot-body">
             <h2 class="lot-title">${escapeHtml(lot.title)}</h2>
             <div class="lot-meta num">opens at ${formatNim(lot.startPriceLunas ?? 0)} NIM</div>
@@ -156,7 +157,7 @@ export function renderLobby(container, { navigate }) {
     if (results.length) {
       const rows = results.slice(0, 5).map((lot) => `
         <div class="card lot-card" style="margin-bottom:8px" data-enter="${escapeAttr(lot.id)}" role="button" aria-label="${escapeAttr(lot.title)}, sold for ${formatNim(lot.winningBidLunas ?? 0)} NIM">
-          <img class="thumb" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
+          <img class="thumb" loading="lazy" decoding="async" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
           <div class="lot-body">
             <div class="lot-title">${escapeHtml(lot.title)}</div>
             <div class="lot-meta num">

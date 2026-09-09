@@ -1,5 +1,5 @@
-// Router. Gates 1+2+4+6 shipped. Smart root: Pay users land in the Lobby
-// (zero friction); plain browsers get the Landing.
+// Router. The landing is the front door for everyone — browsers and
+// Nimiq Pay alike; the hero CTA adapts in-app (see views/landing.js).
 import "./styles.css";
 import "@fontsource/space-grotesk/700.css";
 import "@fontsource/inter/400.css";
@@ -20,12 +20,8 @@ export function navigate(path, { replace = false } = {}) {
   render();
 }
 
-function renderRoot(container, options) {
-  return window.nimiq ? renderLobby(container, options) : renderLanding(container, options);
-}
-
 const routes = [
-  { pattern: /^\/$/, view: renderRoot, title: () => "Nimgavel · Live auctions in NIM" },
+  { pattern: /^\/$/, view: renderLanding, title: () => "Nimgavel · Live auctions in NIM" },
   { pattern: /^\/lobby$/, view: renderLobby, title: () => "The lobby · Nimgavel" },
   { pattern: /^\/room\/([^/]+)$/, view: renderRoom, title: (lotId) => `Auction room · Nimgavel` },
   { pattern: /^\/host$/, view: renderHost, title: () => "Host a lot · Nimgavel" },
@@ -61,12 +57,20 @@ function render() {
     return;
   }
 
+  document.title = "Not found · Nimgavel";
   app.innerHTML = `
-    <div style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center">
-      <span style="font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:.06em">NIMGAVEL</span>
-      <span style="color:var(--text-dim);font-size:13px;max-width:30ch">The floor opens at Gate 1. Watch the live room from the link you were sent.</span>
+    <div class="dead-end not-found">
+      <span class="brand" style="font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:.06em">NIMGAVEL</span>
+      <h1 class="dead-title">This floor doesn't exist.</h1>
+      <div class="dead-sub">The link may be mistyped, or the room moved. The gavel falls in the lobby.</div>
+      <div class="dead-actions">
+        <button class="btn sm" id="nf-lobby">Back to the lobby</button>
+        <button class="btn secondary sm" id="nf-results">View results</button>
+      </div>
     </div>
   `;
+  app.querySelector("#nf-lobby").addEventListener("click", () => navigate("/lobby"));
+  app.querySelector("#nf-results").addEventListener("click", () => navigate("/results"));
 }
 
 window.addEventListener("popstate", render);

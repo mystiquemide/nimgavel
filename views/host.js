@@ -71,6 +71,7 @@ export function renderHost(container, { navigate }) {
         <label>Image URL (https)
           <input name="imageUrl" type="url" placeholder="https://…" />
         </label>
+        <div class="dim" style="font-size:12px;margin:-6px 0 4px">Any public https image link works. Leave empty for the gavel.</div>
         <div class="row">
           <label>Start price (NIM)
             <input name="startPrice" type="number" min="0.00001" step="0.00001" value="5" required />

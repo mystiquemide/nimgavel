@@ -1,5 +1,6 @@
-// Gate 6 — Landing. Plain browsers AND (for now) Pay users; the smart
-// root split lands with the Lobby gate. Every claim is real data.
+// Gate 6 — Landing. The front door for everyone: plain browsers and the
+// Nimiq Pay webview. The hero CTA adapts — inside Pay it enters the floor,
+// in a browser it hands off to the wallet. Every claim is real data.
 import { listLots, getRoomState, ApiError } from "../lib/api.js";
 import { formatNim } from "../lib/nimiq.js";
 import { escapeHtml, escapeAttr } from "./room.js";
@@ -14,6 +15,14 @@ const payDeeplink = (path = "/") =>
 
 export function renderLanding(container, { navigate }) {
   const state = { lots: null, room: null, roomTimer: null };
+  const inPay = typeof window !== "undefined" && !!window.nimiq;
+
+  const primaryCta = inPay
+    ? `<button class="btn full" id="enter-floor">Enter the floor →</button>`
+    : `<a class="btn full" href="${payDeeplink()}">Open in Nimiq Pay →</a>`;
+  const finalCta = inPay
+    ? `<button class="btn full" id="enter-floor-final">Enter the floor</button>`
+    : `<a class="btn full" href="${payDeeplink()}">Open in Nimiq Pay</a>`;
 
   container.innerHTML = `
     <div class="landing">
@@ -34,7 +43,7 @@ export function renderLanding(container, { navigate }) {
           on-chain. No escrow, no custody, no middleman.
         </p>
         <div class="cta-row settle" style="animation-delay:240ms">
-          <a class="btn full" href="${payDeeplink()}">Open in Nimiq Pay →</a>
+          ${primaryCta}
           <button class="btn secondary full" id="watch-live">Watch a live auction</button>
         </div>
         <div class="proof-note settle" style="animation-delay:320ms">A mini app that runs inside Nimiq Pay, the Nimiq wallet. Settlements verified on-chain.</div>
@@ -50,8 +59,8 @@ export function renderLanding(container, { navigate }) {
         <div id="results-slot"></div>
       </section>
 
-      <section class="landing-steps">
-        <div class="section-label">HOW A LOT RUNS</div>
+      <section class="landing-steps" id="how-it-works">
+        <h2 class="section-label">HOW A LOT RUNS</h2>
         <div class="step">
           <span class="num-col">01</span>
           <div>
@@ -79,7 +88,7 @@ export function renderLanding(container, { navigate }) {
 
       <section class="landing-final">
         <h2>The next gavel is live.</h2>
-        <a class="btn full" href="${payDeeplink()}">Open in Nimiq Pay</a>
+        ${finalCta}
       </section>
       </main>
 
@@ -95,10 +104,21 @@ export function renderLanding(container, { navigate }) {
     </div>
   `;
 
+  const enterFloor = container.querySelector("#enter-floor");
+  if (enterFloor) enterFloor.addEventListener("click", () => navigate("/lobby"));
+  const enterFloorFinal = container.querySelector("#enter-floor-final");
+  if (enterFloorFinal) enterFloorFinal.addEventListener("click", () => navigate("/lobby"));
+
   container.querySelector("#watch-live").addEventListener("click", () => {
     const lot = state.lots?.live?.[0];
-    if (lot) navigate(`/room/${lot.id}`);
-    else document.querySelector(".landing-live")?.scrollIntoView({ behavior: "smooth" });
+    if (lot) {
+      navigate(`/room/${lot.id}`);
+      return;
+    }
+    // Quiet floor: send the visitor somewhere real instead of a dead section.
+    const hasResults = (state.lots?.results || []).length > 0;
+    if (hasResults) navigate("/results");
+    else container.querySelector("#how-it-works")?.scrollIntoView({ behavior: "smooth" });
   });
 
   (async () => {
@@ -122,8 +142,8 @@ export function renderLanding(container, { navigate }) {
       return;
     }
     slot.innerHTML = results.slice(0, 3).map((lot) => `
-      <div class="card lot-card" style="margin-bottom:8px" data-enter="${escapeAttr(lot.id)}" role="button" tabindex="0" aria-label="${escapeAttr(lot.title)}, sold for ${formatNim(lot.winningBidLunas ?? 0)} NIM">
-        <img class="thumb" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
+      <div class="card lot-card" data-enter="${escapeAttr(lot.id)}" role="button" tabindex="0" aria-label="${escapeAttr(lot.title)}, sold for ${formatNim(lot.winningBidLunas ?? 0)} NIM">
+        <img class="thumb" loading="lazy" decoding="async" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
         <div class="lot-body">
           <div class="lot-title">${escapeHtml(lot.title)}</div>
           <div class="lot-meta num">
@@ -147,13 +167,18 @@ export function renderLanding(container, { navigate }) {
     const lot = state.lots?.live?.[0];
 
     if (!lot) {
+      const hasResults = (state.lots?.results || []).length > 0;
       slot.innerHTML = `
-        <div class="card">
-          <span class="dim" style="font-size:14px">
+        <div class="card quiet-card">
+          <div style="font-size:15px">${state.lots === null ? "Can't reach the auction house right now." : "No live auctions right now."}</div>
+          <div class="dim" style="font-size:13px;margin-top:4px;line-height:1.5">
             ${state.lots === null
-              ? "Can't reach the auction house right now."
-              : "The floor is quiet right now. Open a room and watch."}
-          </span>
+              ? "Your connection or ours. The rooms come back with a refresh."
+              : "Rooms open when a host lists a lot. Check back soon."}
+          </div>
+          ${state.lots !== null && hasResults
+            ? `<a class="btn secondary sm full" style="margin-top:12px" href="/results">View recent results →</a>`
+            : ""}
         </div>`;
       return;
     }

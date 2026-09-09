@@ -44,18 +44,30 @@ export function renderResults(container, { navigate }) {
           : settle
             ? `<span class="settle-chip pending shimmer">checking…</span>`
             : "";
+      const reason = settle?.state === "rejected" && settle.reason
+        ? `<div class="arch-reason">Rejected: ${escapeHtml(settle.reason)}</div>`
+        : "";
       const tx = lot.txHash
-        ? `<a class="mono" style="font-size:11px" href="https://nimiq.watch/#${escapeAttr(lot.txHash)}" target="_blank" rel="noreferrer">${shortHash(lot.txHash)} →</a>`
+        ? `
+          <div class="tx-row">
+            <a class="tx-link" href="https://nimiq.watch/#${escapeAttr(lot.txHash)}" target="_blank" rel="noreferrer" aria-label="View transaction ${escapeAttr(lot.txHash)} on Nimiq Watch">
+              <span class="mono">${shortHash(lot.txHash)}</span>
+              <span class="tx-action">View transaction ↗</span>
+            </a>
+            <button class="copy-hash" type="button" data-hash="${escapeAttr(lot.txHash)}" aria-label="Copy full transaction hash">copy</button>
+          </div>`
         : "";
       return `
-        <div class="arch-row" data-enter="${escapeAttr(lot.id)}" role="button" aria-label="${escapeAttr(lot.title)}, sold for ${formatNim(lot.winningBidLunas ?? 0)} NIM">
-          <img class="thumb" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
+        <div class="arch-row" data-enter="${escapeAttr(lot.id)}" role="button" tabindex="0" aria-label="${escapeAttr(lot.title)}, sold for ${formatNim(lot.winningBidLunas ?? 0)} NIM">
+          <img class="thumb" loading="lazy" decoding="async" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
           <div class="arch-body">
             <h2 class="arch-title">${escapeHtml(lot.title)}</h2>
             <div class="arch-meta">
               <span class="arch-price">${formatNim(lot.winningBidLunas ?? 0)} NIM</span> · won by #${lot.winningPaddle ?? "?"}
             </div>
-            <div style="display:flex;gap:8px;align-items:center;margin-top:6px">${chip} ${tx}</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:6px">${chip}</div>
+            ${reason}
+            ${tx}
           </div>
         </div>`;
     }).join("");
@@ -67,7 +79,25 @@ export function renderResults(container, { navigate }) {
     `;
 
     main.querySelectorAll("[data-enter]").forEach((el) => {
-      el.addEventListener("click", () => navigate(`/room/${el.dataset.enter}`));
+      el.addEventListener("click", (e) => {
+        if (e.target.closest(".tx-link, .copy-hash")) return;
+        navigate(`/room/${el.dataset.enter}`);
+      });
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") navigate(`/room/${el.dataset.enter}`);
+      });
+    });
+    main.querySelectorAll(".copy-hash").forEach((button) => {
+      button.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(button.dataset.hash);
+          button.textContent = "copied";
+        } catch {
+          window.prompt("Copy this transaction hash:", button.dataset.hash);
+        }
+        setTimeout(() => { button.textContent = "copy"; }, 1600);
+      });
     });
   }
 
