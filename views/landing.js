@@ -18,88 +18,105 @@ export function renderLanding(container, { navigate }) {
   const inPay = typeof window !== "undefined" && !!window.nimiq;
 
   const primaryCta = inPay
-    ? `<button class="btn full" id="enter-floor">Enter the floor →</button>`
-    : `<a class="btn full" href="${payDeeplink()}">Open in Nimiq Pay →</a>`;
+    ? `<button class="btn" id="enter-floor">Enter the floor →</button>`
+    : `<a class="btn" href="${payDeeplink()}">Open in Nimiq Pay →</a>`;
   const finalCta = inPay
     ? `<button class="btn full" id="enter-floor-final">Enter the floor</button>`
     : `<a class="btn full" href="${payDeeplink()}">Open in Nimiq Pay</a>`;
+  const headerCta = inPay
+    ? `<button class="btn sm header-cta" id="header-enter">Enter the floor</button>`
+    : `<a class="btn sm header-cta" href="${payDeeplink()}">Open in Nimiq Pay</a>`;
 
   container.innerHTML = `
     <div class="landing">
-      <div class="landing-header">
-        <header class="app-header">
-          <img src="/favicon.svg" alt="Nimgavel" width="28" height="28" />
-          <span class="brand">NIMGAVEL</span>
-        </header>
-      </div>
+      <header class="landing-header">
+        <div class="shell header-inner">
+          <span class="brand-row">
+            <img src="/favicon.svg" alt="Nimgavel" width="28" height="28" />
+            <span class="brand">NIMGAVEL</span>
+          </span>
+          <nav class="header-links" aria-label="Sections">
+            <a href="/results">Results</a>
+            <a href="#how-it-works">How it works</a>
+          </nav>
+          ${headerCta}
+        </div>
+      </header>
 
       <main>
 
       <section class="landing-hero">
-        <div class="kicker settle">LIVE AUCTIONS IN NIMIQ PAY</div>
-        <h1 class="settle" style="animation-delay:80ms">Going once.<br/>Going twice.<br/><span class="nim">NIM.</span></h1>
-        <p class="sub settle" style="animation-delay:160ms">
-          Bid from your Nimiq wallet. The winner pays the seller directly
-          on-chain. No escrow, no custody, no middleman.
-        </p>
-        <div class="cta-row settle" style="animation-delay:240ms">
-          ${primaryCta}
-          <button class="btn secondary full" id="watch-live">Watch a live auction</button>
-        </div>
-        <div class="proof-note settle" style="animation-delay:320ms">A mini app that runs inside Nimiq Pay, the Nimiq wallet. Settlements verified on-chain.</div>
-      </section>
-
-      <section class="landing-live">
-        <div class="section-label live"><span class="live-dot"></span>LIVE NOW</div>
-        <div id="live-slot"><div class="skeleton">checking the floor…</div></div>
-      </section>
-
-      <section class="landing-live" id="landing-results">
-        <div class="section-label">RECENT RESULTS <a href="/results" style="margin-left:auto;font-size:11px;padding:6px 0">all results →</a></div>
-        <div id="results-slot"></div>
-      </section>
-
-      <section class="landing-steps" id="how-it-works">
-        <h2 class="section-label">HOW A LOT RUNS</h2>
-        <div class="step">
-          <span class="num-col">01</span>
-          <div>
-            <h3>Get your paddle</h3>
-            <p>Open Nimgavel in Nimiq Pay. Your device gets a paddle number and alias.</p>
+        <div class="shell hero-grid">
+          <div class="hero-copy">
+            <div class="kicker settle">LIVE AUCTIONS IN NIMIQ PAY</div>
+            <h1 class="settle" style="animation-delay:80ms">Going once.<br/>Going twice.<br/><span class="nim">NIM.</span></h1>
+            <p class="sub settle" style="animation-delay:160ms">
+              Bid from your Nimiq wallet. The winner pays the seller directly
+              on-chain. No escrow, no custody, no middleman.
+            </p>
+            <div class="cta-row settle" style="animation-delay:240ms">
+              ${primaryCta}
+              <button class="btn secondary" id="watch-live">Watch a live auction</button>
+            </div>
+            <div class="proof-note settle" style="animation-delay:320ms">A mini app that runs inside Nimiq Pay, the Nimiq wallet. Settlements verified on-chain.</div>
           </div>
-        </div>
-        <div class="step">
-          <span class="num-col">02</span>
-          <div>
-            <h3>Bid in the room</h3>
-            <p>One tap bids the next amount. Soft close keeps the door open for counterbids.</p>
-          </div>
-        </div>
-        <div class="step">
-          <span class="num-col">03</span>
-          <div>
-            <h3>Winner pays host</h3>
-            <p>The winner pays the host directly. Nimgavel verifies the payment on-chain.</p>
+          <div class="hero-live">
+            <div class="section-label live"><span class="live-dot"></span>LIVE NOW</div>
+            <div id="live-slot"><div class="skeleton">checking the floor…</div></div>
           </div>
         </div>
       </section>
 
-      <div class="trust-strip">no escrow · no custody · no house cut · every tx hash public</div>
+      <section class="landing-section" id="landing-results">
+        <div class="shell">
+          <div class="section-label">RECENT RESULTS <a class="label-link" href="/results">all results →</a></div>
+          <div id="results-slot" class="results-grid"></div>
+        </div>
+      </section>
+
+      <section class="landing-section" id="how-it-works">
+        <div class="shell">
+          <h2 class="section-label">HOW A LOT RUNS</h2>
+          <div class="steps-grid">
+            <div class="step-card">
+              <span class="num-col">01</span>
+              <h3>Get your paddle</h3>
+              <p>Open Nimgavel in Nimiq Pay. Your device gets a paddle number and alias.</p>
+            </div>
+            <div class="step-card">
+              <span class="num-col">02</span>
+              <h3>Bid in the room</h3>
+              <p>One tap bids the next amount. Soft close keeps the door open for counterbids.</p>
+            </div>
+            <div class="step-card">
+              <span class="num-col">03</span>
+              <h3>Winner pays host</h3>
+              <p>The winner pays the host directly. Nimgavel verifies the payment on-chain.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="trust-strip"><div class="shell">no escrow · no custody · no house cut · every tx hash public</div></div>
 
       <section class="landing-final">
-        <h2>The next gavel is live.</h2>
-        ${finalCta}
+        <div class="shell final-row">
+          <h2>The next gavel is live.</h2>
+          ${finalCta}
+        </div>
       </section>
       </main>
 
       <footer class="landing-footer">
-        <span>Nimgavel <span class="mono">· live auctions in NIM</span></span>
-        <nav class="footer-links" aria-label="Trust">
-          <a href="/results">Results</a>
-          <a href="https://github.com/mystiquemide/nimgavel" target="_blank" rel="noopener">Source</a>
-          <a href="https://github.com/mystiquemide/nimgavel/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>
-          <a href="https://nimiq.com/pay/" target="_blank" rel="noopener">Nimiq Pay</a>
-        </nav>
+        <div class="shell footer-inner">
+          <span class="footer-brand">Nimgavel <span class="mono">· live auctions in NIM</span></span>
+          <nav class="footer-links" aria-label="Trust">
+            <a href="/results">Results</a>
+            <a href="https://github.com/mystiquemide/nimgavel" target="_blank" rel="noopener">Source</a>
+            <a href="https://github.com/mystiquemide/nimgavel/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>
+            <a href="https://nimiq.com/pay/" target="_blank" rel="noopener">Nimiq Pay</a>
+          </nav>
+        </div>
       </footer>
     </div>
   `;
@@ -108,6 +125,8 @@ export function renderLanding(container, { navigate }) {
   if (enterFloor) enterFloor.addEventListener("click", () => navigate("/lobby"));
   const enterFloorFinal = container.querySelector("#enter-floor-final");
   if (enterFloorFinal) enterFloorFinal.addEventListener("click", () => navigate("/lobby"));
+  const headerEnter = container.querySelector("#header-enter");
+  if (headerEnter) headerEnter.addEventListener("click", () => navigate("/lobby"));
 
   container.querySelector("#watch-live").addEventListener("click", () => {
     const lot = state.lots?.live?.[0];
@@ -142,11 +161,11 @@ export function renderLanding(container, { navigate }) {
       return;
     }
     slot.innerHTML = results.slice(0, 3).map((lot) => `
-      <div class="card lot-card" data-enter="${escapeAttr(lot.id)}" role="button" tabindex="0" aria-label="${escapeAttr(lot.title)}, sold for ${formatNim(lot.winningBidLunas ?? 0)} NIM">
-        <img class="thumb" loading="lazy" decoding="async" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
-        <div class="lot-body">
-          <div class="lot-title">${escapeHtml(lot.title)}</div>
-          <div class="lot-meta num">
+      <div class="card result-card" data-enter="${escapeAttr(lot.id)}" role="button" tabindex="0" aria-label="${escapeAttr(lot.title)}, sold for ${formatNim(lot.winningBidLunas ?? 0)} NIM">
+        <img class="result-img" loading="lazy" decoding="async" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
+        <div class="result-body">
+          <div class="result-title">${escapeHtml(lot.title)}</div>
+          <div class="result-meta num">
             <span class="lot-price">${formatNim(lot.winningBidLunas ?? 0)} NIM</span> · won by #${lot.winningPaddle ?? "?"}
             ${lot.settlement?.state === "verified" ? ` · <span style="color:var(--green)">✓ verified</span>` : ""}
           </div>
@@ -187,7 +206,7 @@ export function renderLanding(container, { navigate }) {
     const bid = room?.currentBidLunas ?? lot.startPriceLunas ?? 0;
     const connections = room?.connections ?? null;
     slot.innerHTML = `
-      <div class="card lot-card">
+      <div class="card lot-card hero-lot">
         <img class="thumb" src="${escapeAttr(lot.imageUrl || "/favicon.svg")}" alt="${escapeAttr(lot.title)}" />
         <div class="lot-body">
           <h2 class="lot-title">${escapeHtml(lot.title)}</h2>

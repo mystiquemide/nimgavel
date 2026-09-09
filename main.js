@@ -21,11 +21,11 @@ export function navigate(path, { replace = false } = {}) {
 }
 
 const routes = [
-  { pattern: /^\/$/, view: renderLanding, title: () => "Nimgavel · Live auctions in NIM" },
-  { pattern: /^\/lobby$/, view: renderLobby, title: () => "The lobby · Nimgavel" },
-  { pattern: /^\/room\/([^/]+)$/, view: renderRoom, title: (lotId) => `Auction room · Nimgavel` },
-  { pattern: /^\/host$/, view: renderHost, title: () => "Host a lot · Nimgavel" },
-  { pattern: /^\/results$/, view: renderResults, title: () => "Results · Nimgavel" }
+  { pattern: /^\/$/, name: "landing", view: renderLanding, title: () => "Nimgavel · Live auctions in NIM" },
+  { pattern: /^\/lobby$/, name: "lobby", view: renderLobby, title: () => "The lobby · Nimgavel" },
+  { pattern: /^\/room\/([^/]+)$/, name: "room", view: renderRoom, title: (lotId) => `Auction room · Nimgavel` },
+  { pattern: /^\/host$/, name: "host", view: renderHost, title: () => "Host a lot · Nimgavel" },
+  { pattern: /^\/results$/, name: "results", view: renderResults, title: () => "Results · Nimgavel" }
 ];
 
 // Per-screen document titles (tabs, history, shares).
@@ -51,6 +51,7 @@ function render() {
   }
 
   const matched = matchRoute(location.pathname);
+  document.body.dataset.route = matched ? matched.route.name : "notfound";
   if (matched) {
     if (matched.route.title) document.title = matched.route.title(...matched.params);
     cleanup = matched.route.view(app, { navigate, params: matched.params });
