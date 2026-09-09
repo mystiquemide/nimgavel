@@ -84,8 +84,13 @@ export function renderLanding(container, { navigate }) {
       </main>
 
       <footer class="landing-footer">
-        <span>Nimgavel</span>
-        <span class="mono">live auctions in NIM</span>
+        <span>Nimgavel <span class="mono">· live auctions in NIM</span></span>
+        <nav class="footer-links" aria-label="Trust">
+          <a href="/results">Results</a>
+          <a href="https://github.com/mystiquemide/nimgavel" target="_blank" rel="noopener">Source</a>
+          <a href="https://github.com/mystiquemide/nimgavel/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>
+          <a href="https://nimiq.com/pay/" target="_blank" rel="noopener">Nimiq Pay</a>
+        </nav>
       </footer>
     </div>
   `;

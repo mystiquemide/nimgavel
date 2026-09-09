@@ -298,11 +298,17 @@ button { font-family: inherit; }
 .landing-final h2 { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -0.5px; margin: 0 0 14px; }
 
 .landing-footer {
-  margin-top: auto; padding: 18px 0 16px;
+  margin-top: auto; padding: 12px 0 16px;
   color: var(--text-dim); font-size: 12px;
-  display: flex; justify-content: space-between; gap: 8px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px;
   border-top: 1px solid var(--border);
 }
+.footer-links { display: flex; flex-wrap: wrap; gap: 0 4px; }
+.footer-links a {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-dim);
+}
+.footer-links a:hover, .footer-links a:focus-visible { color: var(--text); }
 
 /* Section labels (shared) */
 .section-label {
