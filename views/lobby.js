@@ -39,7 +39,7 @@ export function renderLobby(container) {
     const connections = room?.connections ?? 0;
     const bidCount = Array.isArray(room?.bids) ? room.bids.length : 0;
     const leader = room?.leadingPaddle
-      ? `Paddle #${room.leadingPaddle} leading`
+      ? `Paddle #${typeof room.leadingPaddle === "object" ? room.leadingPaddle.paddle : room.leadingPaddle} leading`
       : status === "upcoming" ? "Reserve price set" : "Awaiting first bid";
     const themeClasses = ["card-theme-wheat", "card-theme-coral", "card-theme-butter", "card-theme-mint"];
     const themeClass = themeClasses[Math.abs(hashString(lot.id)) % themeClasses.length];
@@ -257,7 +257,12 @@ export function renderLobby(container) {
         count.textContent = `${bidCount} bids · ${room.connections} in room`;
       }
       const leader = card.querySelector(".lobby-bid-leader");
-      if (leader) leader.textContent = room.leadingPaddle ? `Paddle #${room.leadingPaddle} leading` : "Awaiting first bid";
+      if (leader) {
+        const lp = room.leadingPaddle;
+        leader.textContent = lp
+          ? `Paddle #${typeof lp === "object" ? lp.paddle : lp} leading`
+          : "Awaiting first bid";
+      }
     }
   }
 

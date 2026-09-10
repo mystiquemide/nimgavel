@@ -481,9 +481,7 @@ export function renderRoom(container, lotId) {
         state.endsAt = message.endsAt;
         state.currentBid = message.currentBidLunas || 0;
         state.minNext = message.minNextBidLunas || 0;
-        state.leading = message.leadingPaddle
-          ? { paddle: message.leadingPaddle, alias: message.leadingAlias || "" }
-          : null;
+        state.leading = normalizeLeading(message.leadingPaddle, message.leadingAlias);
         state.bids = (message.bids || []).slice().reverse();
         state.connections = message.connections || 0;
         if (message.lot) {
@@ -698,6 +696,14 @@ export function renderRoom(container, lotId) {
     if (state.toastTimer) clearTimeout(state.toastTimer);
     if (state.socket) state.socket.close();
   };
+}
+
+function normalizeLeading(leading, fallbackAlias) {
+  if (!leading) return null;
+  if (typeof leading === "object") {
+    return { paddle: leading.paddle, alias: leading.alias || "" };
+  }
+  return { paddle: leading, alias: fallbackAlias || "" };
 }
 
 function formatRemaining(ms) {
