@@ -1,7 +1,7 @@
 import { listLots, getRoomState, ApiError } from "../lib/api.js";
 import { formatNim } from "../lib/nimiq.js";
-import { session, bootWallet, isSpectate, walletReady } from "../lib/session.js";
-import { qrToggleMarkup, wireQrToggle } from "../lib/qr.js";
+import { session, bootWallet, resetBoot, getBootState, isSpectate, walletReady } from "../lib/session.js";
+import { qrToggleMarkup, wireQrToggle, storeLinksMarkup } from "../lib/qr.js";
 import { escapeHtml, escapeAttr, shortAddress } from "./room.js";
 
 const LIST_REFRESH_MS = 30_000;
@@ -24,11 +24,20 @@ export function renderLobby(container) {
     if (isSpectate()) {
       return `<span class="paddle-val" id="user-paddle-display">Spectator · open in Nimiq Pay</span>`;
     }
-    if (!state.walletBooted) return `<span class="paddle-val" id="user-paddle-display">connecting…</span>`;
+    const boot = getBootState().status;
+    if (boot === "connecting" || boot === "idle") {
+      return `<span class="paddle-val" id="user-paddle-display">connecting…</span>`;
+    }
     if (walletReady() && session.paddle) {
       return `<span class="paddle-val" id="user-paddle-display">#${session.paddle} ${escapeHtml(session.alias || "")}</span>`;
     }
-    return `<span class="paddle-val" id="user-paddle-display">Paddle unavailable</span>`;
+    if (boot === "ready" && !session.paddle) {
+      return `<span class="paddle-val" id="user-paddle-display">Paddle unavailable</span>`;
+    }
+    // cancelled | no_accounts | paddle_error: recoverable with a retry.
+    return `
+      <span class="paddle-val" id="user-paddle-display">Wallet didn't respond</span>
+      <button type="button" class="btn-paddle-retry" id="btn-paddle-retry">Retry</button>`;
   }
 
   function lotCard(lot, room, status) {
@@ -123,7 +132,7 @@ export function renderLobby(container) {
     const emptyCopy = {
       all: ["No auctions on the block right now.", "Rooms open when a host lists a lot. Check back soon or host the next one."],
       live: ["No live bidding right now.", "Rooms open when a host lists a lot. Check back soon."],
-      closing: ["Nothing is closing right now.", "Live rooms enter their final 30 seconds here — with the anti-snipe window in play."],
+      closing: ["Nothing is closing right now.", "Live rooms enter their final 30 seconds here, with the anti-snipe window in play."],
       upcoming: ["No upcoming auctions yet.", "Scheduled lots land here before they open. Host the next one and pick your start time."]
     }[activeFilter] || ["Nothing here yet.", "Check back soon."];
     return `
@@ -207,7 +216,7 @@ export function renderLobby(container) {
             <a class="btn-open-pay" href="nimiqpay://miniapp?url=${encodeURIComponent(APP_ORIGIN + "/lobby")}">Open in Nimiq Pay</a>
           </span>
         </div>
-        <p class="spectate-install-note">No Nimiq Pay yet? Get it free at <a href="https://nimiq.com/pay/" target="_blank" rel="noopener">nimiq.com/pay</a> — then scan the QR to jump straight into the floor.</p>` : ""}
+        <p class="spectate-install-note">No Nimiq Pay yet? Get it free: ${storeLinksMarkup()} · <a href="https://www.nimiq.com/nimiq-pay" target="_blank" rel="noopener">nimiq.com/nimiq-pay</a>. Then scan the QR to jump straight into the floor.</p>` : ""}
 
         <!-- Filter Pills Bar -->
         <div class="lobby-filters-bar" role="tablist" aria-label="Filter auction lots">
@@ -269,6 +278,13 @@ export function renderLobby(container) {
         deeplink: `nimiqpay://miniapp?url=${encodeURIComponent(APP_ORIGIN + "/lobby")}`
       });
     }
+
+    const paddleRetry = container.querySelector("#btn-paddle-retry");
+    if (paddleRetry) paddleRetry.addEventListener("click", () => {
+      resetBoot();
+      render();
+      bootWallet().then(() => render());
+    });
 
     initAnimations(container);
   }

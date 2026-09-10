@@ -166,6 +166,9 @@ export function renderLanding(container) {
                   <span aria-hidden="true">↗</span>
                 </a>
               </li>
+              <li><a href="/how-it-works" class="footer-link">How It Works</a></li>
+              <li><a href="/privacy" class="footer-link">Privacy</a></li>
+              <li><a href="/terms" class="footer-link">Terms</a></li>
             </ul>
           </div>
         </nav>

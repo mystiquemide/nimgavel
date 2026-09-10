@@ -1,6 +1,8 @@
 export function renderNav(container, { activePath = "/" } = {}) {
   const isLobby = activePath === "/lobby";
   const isResults = activePath === "/results";
+  const isHost = activePath === "/host";
+  const isDocs = activePath === "/how-it-works";
 
   container.innerHTML = `
     <header class="nav-wrapper">
@@ -24,13 +26,17 @@ export function renderNav(container, { activePath = "/" } = {}) {
               <a href="/results" class="nav-link ${isResults ? "active" : ""}">Results</a>
             </li>
             <li>
-              <a href="/#rules" class="nav-link">How It Works</a>
+              <a href="/how-it-works" class="nav-link ${isDocs ? "active" : ""}">How It Works</a>
             </li>
           </ul>
 
           <div class="nav-actions">
-            ${
-              isLobby || activePath.startsWith("/room")
+            ${isHost
+              ? `<a href="/lobby" class="btn-primary-nav" id="nav-cta-btn">
+                   <span>Enter the Floor</span>
+                   <span aria-hidden="true">→</span>
+                 </a>`
+              : isLobby || activePath.startsWith("/room")
                 ? `<a href="/host" class="btn-primary-nav" id="nav-cta-btn">
                      <span aria-hidden="true">+</span>
                      <span>Host an Auction</span>
@@ -53,8 +59,8 @@ export function renderNav(container, { activePath = "/" } = {}) {
         <div class="mobile-menu-drawer" id="mobile-drawer" aria-hidden="true">
           <a href="/lobby" class="mobile-link">Auction Floor</a>
           <a href="/results" class="mobile-link">Past Results</a>
-          <a href="/#rules" class="mobile-link">How It Works</a>
-          <a href="/host" class="mobile-link">Host an Auction</a>
+          <a href="/how-it-works" class="mobile-link">How It Works</a>
+          ${isHost ? "" : `<a href="/host" class="mobile-link">Host an Auction</a>`}
         </div>
       </div>
     </header>

@@ -54,7 +54,7 @@ export function renderResults(container) {
               </span>
             </div>
             <p class="results-page-desc">
-              Public proof of every hammer price, winning paddle, and on-chain settlement check on Nimiq. Rejected payment attempts stay on the ledger — that is the verification working.
+              Public proof of every hammer price, winning paddle, and on-chain settlement check on Nimiq. Rejected payment attempts stay on the ledger; that is the verification working.
             </p>
           </div>
 

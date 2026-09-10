@@ -6,7 +6,8 @@ import {
   ApiError
 } from "../lib/api.js";
 import { formatNim, signMessage, getAccount, WalletCancelledError } from "../lib/nimiq.js";
-import { session, bootWallet, isSpectate, walletReady } from "../lib/session.js";
+import { session, bootWallet, resetBoot, getBootState, isSpectate, walletReady } from "../lib/session.js";
+import { storeLinksMarkup, walletTroubleCard } from "../lib/qr.js";
 import { escapeHtml, escapeAttr, shortAddress } from "./room.js";
 
 const myLotsKey = "nimgavel.myLots"; // lotId -> { hostToken, savedAt }
@@ -25,9 +26,9 @@ export function renderHost(container) {
   };
 
   function hostChip() {
-    if (!state.walletBooted) return "connecting…";
-    if (walletReady() && getAccount()) return shortAddress(getAccount());
     if (isSpectate()) return "Spectator";
+    if (walletReady() && getAccount()) return shortAddress(getAccount());
+    if (getBootState().status === "connecting" || getBootState().status === "idle") return "connecting…";
     return "Wallet unavailable";
   }
 
@@ -36,12 +37,17 @@ export function renderHost(container) {
       renderShareView();
       return;
     }
-    if (!state.walletBooted) {
+    if (isSpectate()) {
+      renderSpectateGate();
+      return;
+    }
+    const boot = getBootState().status;
+    if (boot === "connecting" || boot === "idle") {
       renderBootGate();
       return;
     }
     if (!walletReady() || !getAccount()) {
-      renderSpectateGate();
+      renderWalletTroubleGate();
       return;
     }
     renderForm();
@@ -99,14 +105,42 @@ export function renderHost(container) {
             </svg>
           </div>
           <h2 class="quiet-title">Hosting runs inside Nimiq Pay.</h2>
-          <p class="quiet-desc">Your wallet signs the lot into existence — that's the whole registration. No accounts, no passwords.</p>
+          <p class="quiet-desc">Your wallet signs the lot into existence. That is the whole registration. No accounts, no passwords.</p>
           <div class="quiet-actions">
             <a class="btn-quiet-results" href="nimiqpay://miniapp?url=${encodeURIComponent(APP_ORIGIN + "/host")}">Open in Nimiq Pay</a>
             <a class="btn-quiet-host" href="/lobby">Back to the Floor</a>
           </div>
+          <p class="spectate-install-note">Get it free: ${storeLinksMarkup()} · <a href="https://www.nimiq.com/nimiq-pay" target="_blank" rel="noopener">nimiq.com/nimiq-pay</a></p>
         </div>
       </div>
     `;
+  }
+
+  function renderWalletTroubleGate() {
+    container.innerHTML = `
+      <div class="host-view">
+        <div class="host-header-bar">
+          <div class="host-back-group">
+            <a href="/lobby" class="btn-back-nav" aria-label="Return to Auction Floor">
+              <span aria-hidden="true">←</span>
+              <span>Back to Floor</span>
+            </a>
+            <div class="host-title-wrap">
+              <h1 class="host-title">Host an Auction</h1>
+              <span class="host-badge">Zero Listing Fees</span>
+            </div>
+          </div>
+        </div>
+        ${walletTroubleCard("btn-wallet-retry")}
+        <p class="spectate-install-note">Still failing? Make sure Nimiq Pay is up to date: ${storeLinksMarkup()}</p>
+      </div>
+    `;
+    const retry = container.querySelector("#btn-wallet-retry");
+    if (retry) retry.addEventListener("click", () => {
+      resetBoot();
+      render();
+      bootWallet().then(() => render());
+    });
   }
 
   function renderForm() {
@@ -609,12 +643,9 @@ export function renderHost(container) {
   // Pay webviews run the connect handshake before the form unlocks.
   if (!isSpectate()) {
     bootWallet().then(() => {
-      state.walletBooted = true;
       render();
       refreshMyLots();
     });
-  } else {
-    state.walletBooted = true;
   }
 
   render();

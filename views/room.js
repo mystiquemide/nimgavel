@@ -4,9 +4,9 @@ import {
   sendPayment,
   WalletCancelledError
 } from "../lib/nimiq.js";
-import { session, bootWallet, isSpectate, walletReady } from "../lib/session.js";
+import { session, bootWallet, resetBoot, getBootState, isSpectate, walletReady } from "../lib/session.js";
 import { createRoomSocket } from "../lib/ws.js";
-import { qrToggleMarkup, wireQrToggle, PAY_INSTALL_URL } from "../lib/qr.js";
+import { qrToggleMarkup, wireQrToggle, storeLinksMarkup, walletTroubleCard } from "../lib/qr.js";
 
 const APP_ORIGIN = "https://nimgavel.artistic-chip.workers.dev";
 
@@ -79,7 +79,7 @@ export function renderRoom(container, lotId) {
 
           <div class="room-user-chip">
             <span class="paddle-tag">Your Bidding Paddle</span>
-            <span class="paddle-val">${userPaddle !== null ? `#${userPaddle} (${escapeHtml(userAlias)})` : "Spectator"}</span>
+            <span class="paddle-val">${userPaddle !== null ? `#${userPaddle} (${escapeHtml(userAlias)})` : isSpectate() ? "Spectator" : getBootState().status === "connecting" || getBootState().status === "idle" ? "connecting…" : "Wallet unavailable"}</span>
           </div>
         </div>
 
@@ -173,7 +173,9 @@ export function renderRoom(container, lotId) {
                 </div>
                 <div class="feed-list-wrap" id="room-feed-list" role="log" aria-live="polite">
                   ${state.bids.length ? state.bids.map(renderFeedRow).join("")
-                    : `<div class="feed-empty">No bids yet. The opening bid is ${formatNim(state.minNext || state.startPrice)} NIM.</div>`}
+                    : state.socketStatus === "open"
+                      ? `<div class="feed-empty">No bids yet. The opening bid is ${formatNim(state.minNext || state.startPrice)} NIM.</div>`
+                      : `<div class="feed-empty">Connecting to the room. Live bids stream in here.</div>`}
                 </div>
               </div>
 
@@ -276,7 +278,7 @@ export function renderRoom(container, lotId) {
       return `
         <div class="phase-banner banner-amber">
           <span class="phase-gavel-icon">🔔</span>
-          <span class="phase-text">THE GAVEL FELL — no qualifying bids. The lot passed.</span>
+          <span class="phase-text">THE GAVEL FELL. No qualifying bids. The lot passed.</span>
         </div>
       `;
     }
@@ -296,7 +298,15 @@ export function renderRoom(container, lotId) {
     }
     if (state.phase === "passed") return renderEndedCard();
 
-    // Spectators (plain browser or wallet not booted) get the Pay handoff.
+    // Spectators get the Pay handoff; an in-app wallet that failed to
+    // answer gets a retry instead of a misleading "open the app" card.
+    if (!isSpectate() && (!walletReady() || session.paddle === null)) {
+      return `
+        <div class="spectate-deck-note">
+          ${walletTroubleCard("room-wallet-retry")}
+        </div>
+      `;
+    }
     if (!walletReady() || session.paddle === null) {
       const deeplink = `nimiqpay://miniapp?url=${encodeURIComponent(`${APP_ORIGIN}/room/${lotId}`)}`;
       return `
@@ -309,7 +319,7 @@ export function renderRoom(container, lotId) {
               <span aria-hidden="true">→</span>
             </a>
           </div>
-          <p class="spectate-install-note">No Nimiq Pay yet? Get it free at <a href="${PAY_INSTALL_URL}" target="_blank" rel="noopener">nimiq.com/pay</a>.</p>
+          <p class="spectate-install-note">Get it free: ${storeLinksMarkup()} · <a href="https://www.nimiq.com/nimiq-pay" target="_blank" rel="noopener">nimiq.com/nimiq-pay</a></p>
         </div>
       `;
     }
@@ -488,11 +498,20 @@ export function renderRoom(container, lotId) {
     if (stickyBtn) stickyBtn.addEventListener("click", () => placeBid(state.minNext));
 
     if (!walletReady() || session.paddle === null) {
-      wireQrToggle({
-        container,
-        toggleId: "room-qr-toggle",
-        deeplink: `nimiqpay://miniapp?url=${encodeURIComponent(`${APP_ORIGIN}/room/${lotId}`)}`
-      });
+      if (!isSpectate()) {
+        const roomRetry = container.querySelector("#room-wallet-retry");
+        if (roomRetry) roomRetry.addEventListener("click", () => {
+          resetBoot();
+          render();
+          bootWallet().then(() => render());
+        });
+      } else {
+        wireQrToggle({
+          container,
+          toggleId: "room-qr-toggle",
+          deeplink: `nimiqpay://miniapp?url=${encodeURIComponent(`${APP_ORIGIN}/room/${lotId}`)}`
+        });
+      }
     }
   }
 

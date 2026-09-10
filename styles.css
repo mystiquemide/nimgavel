@@ -3819,3 +3819,49 @@ body.animate-ready [data-animate-stagger].in-view > [data-animate-child]:nth-chi
 @media (min-width: 1100px) {
   .hero-center-content { text-align: left; }
 }
+
+/* ===== In-app round: wallet retry, store links, docs + legal pages ===== */
+.btn-paddle-retry {
+  min-height: 36px; margin-left: 8px; padding: 6px 14px;
+  background: var(--gold-primary); color: var(--ink-dark);
+  font-family: var(--font-display); font-weight: 700; font-size: 12px;
+  border: 1.5px solid var(--ink); border-radius: 999px; cursor: pointer;
+}
+
+.wallet-trouble-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 18px 20px; margin: 4px 0;
+  background: var(--canvas-card);
+  border: 1.5px dashed var(--coral-accent);
+  border-radius: 16px;
+}
+.wallet-trouble-title { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 17px; color: var(--ink); }
+.wallet-trouble-desc { margin: 0; font-size: 14px; color: var(--ink-muted); line-height: 1.5; }
+.wallet-trouble-card .btn-raise-paddle { min-height: 44px; }
+
+.store-links { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.store-links a {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  color: var(--green-bold); text-decoration: underline;
+  padding: 4px 2px;
+}
+
+/* Documentation + legal pages */
+.doc-view { max-width: 880px; margin: 0 auto; padding: 24px 0 48px; }
+.doc-header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px; }
+.doc-title { font-family: var(--font-display); font-weight: 800; font-size: clamp(30px, 4vw, 42px); letter-spacing: -1px; color: var(--ink); margin: 0; }
+.doc-lede { margin: 0; font-size: 17px; color: var(--ink-muted); line-height: 1.55; max-width: 60ch; }
+.doc-section { margin: 40px 0; }
+.doc-section h2 {
+  font-family: var(--font-display); font-weight: 800; font-size: 22px;
+  color: var(--ink); margin: 0 0 14px; letter-spacing: -0.3px;
+}
+.doc-section p { font-size: 15.5px; line-height: 1.65; color: var(--ink-muted); margin: 0 0 12px; }
+.doc-section a { color: var(--green-bold); font-weight: 600; }
+.doc-steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 14px; }
+.doc-steps li { font-size: 15.5px; line-height: 1.6; color: var(--ink-muted); }
+.doc-steps strong { color: var(--ink); }
+.doc-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
+.doc-list li { font-size: 15.5px; line-height: 1.6; color: var(--ink-muted); }
+.doc-store-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+.doc-store-row a { color: var(--green-bold); font-weight: 600; text-decoration: underline; }

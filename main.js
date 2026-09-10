@@ -5,6 +5,9 @@ import { renderRoom } from "./views/room.js";
 import { renderHost } from "./views/host.js";
 import { renderResults } from "./views/results.js";
 import { renderNotFound } from "./views/not-found.js";
+import { renderHowItWorks } from "./views/how-it-works.js";
+import { renderPrivacy } from "./views/privacy.js";
+import { renderTerms } from "./views/terms.js";
 
 let cleanup = null;
 
@@ -30,9 +33,12 @@ function initApp() {
         <span class="trust-footer-brand">NIMGAVEL</span>
         <nav class="trust-footer-links" aria-label="Trust links">
           <a href="/results">Results</a>
+          <a href="/how-it-works">How It Works</a>
           <a href="https://nimiq.watch" target="_blank" rel="noopener noreferrer">Nimiq Watch ↗</a>
           <a href="https://github.com/mystiquemide/nimgavel" target="_blank" rel="noopener noreferrer">Source ↗</a>
           <a href="https://nimiq.com/pay/" target="_blank" rel="noopener noreferrer">Nimiq Pay ↗</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
         </nav>
       </footer>`}
     `;
@@ -53,6 +59,12 @@ function initApp() {
       cleanup = renderHost(mainContent) || null;
     } else if (path === "/results") {
       cleanup = renderResults(mainContent) || null;
+    } else if (path === "/how-it-works") {
+      cleanup = renderHowItWorks(mainContent) || null;
+    } else if (path === "/privacy") {
+      cleanup = renderPrivacy(mainContent) || null;
+    } else if (path === "/terms") {
+      cleanup = renderTerms(mainContent) || null;
     } else {
       renderNotFound(mainContent);
     }
