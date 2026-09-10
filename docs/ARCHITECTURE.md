@@ -25,11 +25,7 @@ Two entry URLs for the app: standard HTTPS (workers.dev or custom domain) and th
 
 ## 2. Components
 
-### Frontend (Vite + vanilla JS modules)
-- `lib/nimiq.js`: SDK wrapper. `init()`, `listAccounts()`, `requestDeviceIdentifier()`, `sign()`, `sendBasicTransaction()`. Detects absence of provider (plain browser) and switches to spectate mode.
-- `lib/ws.js`: reconnecting WebSocket client with exponential backoff, server-time offset sync.
-- Views: lobby, room, host, settle. Router in `main.js`.
-- Design tokens and components per DESIGN.md.
+This repository contains the backend (worker, Durable Object, D1). The web client served at the live URL is a deployed Nimiq Pay mini-app SPA that talks to the API below via WebSocket + fetch.
 
 ### Worker (stateless router)
 - REST endpoints (table in section 5).
@@ -147,9 +143,9 @@ Device ids are pseudonymous and client-attested only; acceptable threat trade fo
 
 ## 10. Dev, test, deploy
 
-- Local: `wrangler dev` serves worker + DO + D1 locally; Vite dev proxy for the frontend. Browser QA runs in spectate mode; scripted WS clients (Node) drive full auction lifecycles including soft-close wars.
+- Local: `wrangler dev` serves worker + DO + D1 locally. Scripted WS clients (Node) drive full auction lifecycles including soft-close wars.
 - Stress gate: 2 scripted paddles, 50+ bids, extension storms, restart-DO-mid-auction. Auction must close correctly with exact winning bid.
-- Deploy: Workers with assets (`dist`), `run_worker_first` for `/api/*` and `/ws/*`, D1 binding, DO binding with SQLite class migration. HTTPS via workers.dev subdomain; custom domain optional later.
+- Deploy: Workers + D1 binding + DO binding with SQLite class migration. HTTPS via workers.dev subdomain; custom domain optional later. The live URL also serves the deployed web client's static assets.
 - Health: `GET /health` returns build id + D1 check (nimquest pattern).
 
 ## 11. Metrics (D1-derived)

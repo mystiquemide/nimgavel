@@ -35,17 +35,17 @@ Run everything locally:
 ```bash
 npm install
 npx wrangler d1 migrations apply nimgavel --local   # local D1
-npx wrangler dev --port 8799 &                      # worker + site
+npx wrangler dev --port 8799 &                      # worker (API + WS)
 npm test                                            # 19 tests (needs the dev server)
 ```
 
 ## Architecture
 
-- **Frontend:** vanilla JS SPA (Vite) — landing, lobby, live room, host console, results archive
+This repository contains the Nimgavel backend; the live URL serves the deployed web client.
+
 - **Worker:** Cloudflare Workers — REST API + WebSocket rooms
 - **Rooms:** one Durable Object per auction (authoritative state, soft-close alarms, hibernation-safe)
 - **Data:** D1 (lots, bids, paddles, settlements)
-- **Wallet:** `@nimiq/mini-app-sdk` — device identity for paddles, `sign()` for host auth, `sendBasicTransaction()` for payouts
 - **Settlement:** winner-pays-host direct transfer; worker verifies the tx on-chain via public Nimiq RPC ([rpc.nimiqwatch.com](https://rpc.nimiqwatch.com))
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
