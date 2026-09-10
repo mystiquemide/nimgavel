@@ -9,6 +9,7 @@ import {
   verifyToken
 } from "./auth.js";
 import { AuctionRoom } from "./auction-room.js";
+import { bidKey } from "../lib/bids.js";
 import {
   SETTLE_STATE,
   rpcUrlForEnv,
@@ -108,9 +109,21 @@ async function routeRequest(request, env, url) {
     return leaderboard(env);
   }
 
-  const lotActionMatch = url.pathname.match(/^\/api\/lots\/([^/]+)\/(start|settle|verify)$/);
+  const bidRemovalMatch = url.pathname.match(/^\/api\/lots\/([^/]+)\/bids\/([^/]+)\/remove$/);
+  if (bidRemovalMatch) {
+    if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
+    const lotId = decodeLotId(bidRemovalMatch[1]);
+    const bidId = decodeLotId(bidRemovalMatch[2]);
+    if (!/^\d{1,10}-\d{1,13}-\d{1,16}$/.test(bidId)) throw new ApiError(400, "Invalid bid id.");
+    return removeLotBid(request, env, lotId, bidId);
+  }
+
+  const lotActionMatch = url.pathname.match(/^\/api\/lots\/([^/]+)\/(start|settle|verify|authorize)$/);
   if (lotActionMatch) {
     const lotId = decodeLotId(lotActionMatch[1]);
+    if (request.method === "POST" && lotActionMatch[2] === "authorize") {
+      return authorizeLotHost(request, env, lotId);
+    }
     if (request.method === "POST" && lotActionMatch[2] === "start") {
       return startLot(request, env, lotId);
     }
@@ -330,6 +343,14 @@ async function createHostChallenge(request, env) {
   }
 
   const database = requireDb(env);
+  let controlLotId = null;
+  if (body.lotId !== undefined) {
+    if (typeof body.lotId !== "string") throw new ApiError(400, "Invalid lot id.");
+    controlLotId = decodeLotId(body.lotId);
+    const lot = await selectLot(database, controlLotId);
+    if (!lot) throw new ApiError(404, "Lot not found.");
+    if (lot.host_address !== hostAddress) throw new ApiError(403, "This wallet is not the lot host.");
+  }
   const now = Date.now();
   await database.prepare(
     "DELETE FROM host_challenges WHERE expires_at <= ?"
@@ -348,7 +369,7 @@ async function createHostChallenge(request, env) {
   const nonce = randomHex(32);
   const expiresAt = now + CHALLENGE_TTL_MS;
   const message = [
-    "Nimgavel host authorization",
+    ...(controlLotId ? ["Nimgavel lot control authorization", `Lot: ${controlLotId}`] : ["Nimgavel host authorization"]),
     `Wallet: ${hostAddress}`,
     `Nonce: ${nonce}`,
     `Issued: ${new Date(now).toISOString()}`,
@@ -376,6 +397,7 @@ async function createLot(request, env) {
   const database = requireDb(env);
   const secret = requireSecret(env);
   const challenge = await getHostChallenge(database, body.challengeId);
+  if (challenge.message.startsWith("Nimgavel lot control authorization\n")) throw new ApiError(400, "This challenge is for an existing lot.");
   const hostAddress = normalizeNimiqAddress(
     body.hostAddress || body.walletAddress || challenge.host_address
   );
@@ -509,6 +531,7 @@ async function leaderboard(env) {
             (SELECT COUNT(*) FROM lots l WHERE l.winning_paddle = p.paddle AND l.status IN ('sold', 'settled')) AS wins
      FROM paddles p
      JOIN bids b ON b.paddle = p.paddle
+     WHERE NOT EXISTS (SELECT 1 FROM bid_removals r WHERE r.lot_id = b.lot_id AND r.paddle = b.paddle AND r.amount_lunas = b.amount_lunas AND r.bid_created_at = b.created_at)
      GROUP BY p.paddle, p.alias
      ORDER BY wins DESC, bids DESC, p.paddle ASC
      LIMIT 25`
@@ -565,15 +588,60 @@ async function getLot(env, lotId) {
     `SELECT b.paddle, p.alias, b.amount_lunas, b.created_at
      FROM bids b
      LEFT JOIN paddles p ON p.paddle = b.paddle
-     WHERE b.lot_id = ?
+     WHERE b.lot_id = ? AND NOT EXISTS (SELECT 1 FROM bid_removals r WHERE r.lot_id = b.lot_id AND r.paddle = b.paddle AND r.amount_lunas = b.amount_lunas AND r.bid_created_at = b.created_at)
      ORDER BY b.id DESC
      LIMIT 100`
   ).bind(lotId).all();
 
+  const removed = await database.prepare(`SELECT r.*, p.alias FROM bid_removals r
+    LEFT JOIN paddles p ON p.paddle = r.paddle WHERE r.lot_id = ?
+    ORDER BY r.removed_at DESC, r.bid_id ASC LIMIT 100`).bind(lotId).all();
   return json({
     lot: toPublicLot(row),
-    bids: (result?.results || []).map(toPublicBid)
+    bids: (result?.results || []).map(toPublicBid),
+    removedBids: (removed.results || []).map(row => ({
+      ...toPublicBid({ ...row, created_at: row.bid_created_at }),
+      removal: { removedAt: row.removed_at, removedBy: row.removed_by, role: row.role, reason: row.reason }
+    }))
   });
+}
+
+async function authorizeLotHost(request, env, lotId) {
+  const body = await readJson(request);
+  const database = requireDb(env);
+  const secret = requireSecret(env);
+  const lot = await selectLot(database, lotId);
+  if (!lot) throw new ApiError(404, "Lot not found.");
+  const challenge = await getHostChallenge(database, body.challengeId);
+  const prefix = `Nimgavel lot control authorization\nLot: ${lotId}\nWallet: ${lot.host_address}\n`;
+  if (challenge.host_address !== lot.host_address || !challenge.message.startsWith(prefix)) {
+    throw new ApiError(401, "The challenge does not authorize this lot.");
+  }
+  const proof = await verifyNimiqSignedMessage({ message: challenge.message, walletAddress: lot.host_address, publicKey: body.publicKey, signature: body.signature });
+  if (!proof.ok) throw new ApiError(401, proof.error);
+  const now = Date.now();
+  const consumed = await database.prepare("UPDATE host_challenges SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, challenge.id, now).run();
+  if (!hasChanges(consumed)) throw new ApiError(409, "Challenge has already been used.");
+  const hostToken = await issueToken({ type: "host", lotId, hostAddress: lot.host_address, exp: Math.floor((now + HOST_TOKEN_TTL_MS) / 1000) }, secret, now);
+  return json({ ok: true, hostToken, expiresAt: new Date(now + HOST_TOKEN_TTL_MS).toISOString() });
+}
+
+async function removeLotBid(request, env, lotId, bidId) {
+  const body = await readJson(request);
+  const row = await selectLot(requireDb(env), lotId);
+  if (!row) throw new ApiError(404, "Lot not found.");
+  const reason = textField(body.reason, "Removal reason", 1, 280);
+  const role = body.role || "bidder";
+  if (!["bidder", "host"].includes(role)) throw new ApiError(400, "Invalid removal role.");
+  const host = role === "host";
+  const token = tokenFrom(request, body, host ? "hostToken" : "paddleToken", host ? "x-host-token" : "x-paddle-token");
+  const auth = await verifyToken(token, requireSecret(env), host ? { type: "host", lotId, hostAddress: row.host_address } : { type: "paddle" });
+  if (!auth.ok) throw new ApiError(401, "Bid removal authorization is invalid or expired.");
+  const actor = host ? { role, hostAddress: row.host_address } : { role, paddle: auth.payload.paddle };
+  if (!host && (!Number.isSafeInteger(actor.paddle) || actor.paddle < 1)) throw new ApiError(401, "Invalid paddle authorization.");
+  if (!env.ROOM) throw new ApiError(503, "Auction rooms are not configured.");
+  const response = await invokeRoom(request, env, lotId, "/remove-bid", { method: "POST", body: JSON.stringify({ bidId, reason, actor }) });
+  return json(await readResponseJson(response), response.status);
 }
 
 async function startLot(request, env, lotId) {
@@ -866,6 +934,7 @@ function settlementSummary(row) {
 
 function toPublicBid(row) {
   return {
+    id: bidKey(row),
     paddle: Number(row.paddle),
     alias: row.alias || `Paddle ${row.paddle}`,
     amountLunas: Number(row.amount_lunas ?? row.amountLunas),

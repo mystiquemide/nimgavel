@@ -2,6 +2,7 @@
 // All bid validation and ordering happens here. Single writer, no races.
 
 import { verifyToken } from "./auth.js";
+import { bidKey, highestActiveBid } from "../lib/bids.js";
 
 const SOFT_CLOSE_MS = 30_000; // bids inside the final 30s extend by 30s
 const GOING_ONCE_MS = 30_000; // final-call window begins
@@ -23,6 +24,8 @@ export class AuctionRoom {
     this.sessions = new Map(); // webSocket -> { paddle, alias, lastBidAt }
     this.loaded = false;
     this.finalized = false;
+    this.pendingRemovals = [];
+    this.revision = 0;
   }
 
   // ---------- persistence ----------
@@ -37,6 +40,8 @@ export class AuctionRoom {
       this.currentBid = stored.currentBid;
       this.leading = stored.leading; // { paddle, alias } | null
       this.bidLog = stored.bidLog || [];
+      this.pendingRemovals = stored.pendingRemovals || [];
+      this.revision = stored.revision || 0;
       this.startedAt = stored.startedAt;
       this.finalized = Boolean(stored.finalized);
     } else {
@@ -62,6 +67,8 @@ export class AuctionRoom {
       bidLog: this.bidLog,
       startedAt: this.startedAt,
       finalized: this.finalized,
+      pendingRemovals: this.pendingRemovals,
+      revision: this.revision,
     });
   }
 
@@ -84,6 +91,7 @@ export class AuctionRoom {
     this.phase = "live";
     this.startedAt = now;
     this.endsAt = now + this.lot.durationSec * 1000;
+    this.revision += 1;
     await this.save();
     await this.armAlarm(now);
     await this.persistToD1({ status: "live", startedAt: now });
@@ -105,12 +113,13 @@ export class AuctionRoom {
     const next = this.phaseFor(remaining);
     if (next !== this.phase) {
       this.phase = next;
+      const revision = ++this.revision;
       await this.save();
       if (next === "sold") await this.close(now);
       else if (next === "passed") await this.close(now);
       else {
         await this.armAlarm(now);
-        this.broadcast({ type: "phase", phase: next, endsAt: this.endsAt, serverNow: now });
+        this.broadcast({ type: "phase", revision, phase: next, endsAt: this.endsAt, serverNow: now });
       }
     }
   }
@@ -123,6 +132,10 @@ export class AuctionRoom {
     await this.load();
     const now = Date.now();
     if (!this.lot) return;
+    if (this.pendingRemovals.length) {
+      await this.state.storage.setAlarm(now + 5000);
+      await this.persistRemovals();
+    }
 
     if (this.phase === "sold" || this.phase === "passed") {
       // Finalization path: persist idempotent D1 writes before the flag,
@@ -162,6 +175,7 @@ export class AuctionRoom {
     if (remaining > GOING_ONCE_MS) nextBoundary = this.endsAt - GOING_ONCE_MS;
     else if (remaining > GOING_TWICE_MS) nextBoundary = this.endsAt - GOING_TWICE_MS;
     else nextBoundary = this.endsAt;
+    if (this.pendingRemovals.length) nextBoundary = Math.min(nextBoundary, now + 5000);
     await this.state.storage.setAlarm(Math.max(nextBoundary, now + 50));
   }
 
@@ -195,11 +209,13 @@ export class AuctionRoom {
     }
 
     const prevPhase = this.phase;
+    const revision = ++this.revision;
     this.currentBid = amountLunas;
     this.leading = { paddle, alias };
     // Full bid history: the WS feed slices to FEED_SIZE for clients, but
     // the DO log and D1 archive keep every bid of the war.
-    this.bidLog.push({ paddle, alias, amountLunas, ts: now });
+    const bid = { paddle, alias, amountLunas, ts: now };
+    this.bidLog.push(bid);
 
     // Soft close: any valid bid inside the final 30s extends by 30s
     if (this.endsAt - now <= SOFT_CLOSE_MS) {
@@ -211,11 +227,81 @@ export class AuctionRoom {
     await this.armAlarm(now);
     if (session) session.lastBidAt = now;
 
-    this.broadcast({ type: "bid", paddle, alias, amountLunas, ts: now, endsAt: this.endsAt, serverNow: now });
+    this.broadcast({ type: "bid", revision, id: bidKey(bid), paddle, alias, amountLunas, ts: now, endsAt: this.endsAt, serverNow: now });
     if (this.phase !== prevPhase && this.phase !== "sold") {
-      this.broadcast({ type: "phase", phase: this.phase, endsAt: this.endsAt, serverNow: now });
+      this.broadcast({ type: "phase", revision, phase: this.phase, endsAt: this.endsAt, serverNow: now });
     }
     return { ok: true, currentBid: this.currentBid, endsAt: this.endsAt };
+  }
+
+  async removeBid({ bidId, actor, reason }, now = Date.now()) {
+    await this.load();
+    const bid = this.bidLog.find(entry => bidKey(entry) === bidId);
+    if (!this.lot || !bid) throw new RoomError("bid_not_found", "Bid not found.");
+    if (typeof reason !== "string" || !reason.trim() || reason.trim().length > 280) {
+      throw new RoomError("invalid_reason", "Give a reason between 1 and 280 characters.");
+    }
+    const ownsBid = actor?.role === "bidder" && Number.isSafeInteger(actor.paddle) && actor.paddle > 0 && actor.paddle === bid.paddle;
+    const isHost = actor?.role === "host" && actor.hostAddress === this.lot.hostAddress;
+    if (!ownsBid && !isHost) throw new RoomError("forbidden", "Only this bidder or the host can remove the bid.");
+    if (bid.removal) return this.stateMessage(now);
+    const running = ["live", "going_once", "going_twice"].includes(this.phase);
+    const live = running && now < this.endsAt;
+    const previousLeader = highestActiveBid(this.bidLog);
+    if (!live && bid === previousLeader) throw new RoomError("winning_bid_locked", "The winning bid is locked after the auction closes.");
+    const removedBy = isHost ? this.lot.hostAddress : String(actor.paddle);
+    const last = this.bidLog.filter(entry => entry.removal?.removedBy === removedBy).reduce((time, entry) => Math.max(time, entry.removal.removedAt), 0);
+    if (last && now - last < 1000) throw new RoomError("rate_limited", "Wait a moment before removing another bid.");
+    this.revision += 1;
+    bid.removal = { removedAt: now, removedBy, role: actor.role, reason: reason.trim() };
+    this.pendingRemovals.push(bidId);
+    if (live) {
+      const leader = highestActiveBid(this.bidLog);
+      this.currentBid = leader?.amountLunas || 0;
+      this.leading = leader ? { paddle: leader.paddle, alias: leader.alias } : null;
+      if (previousLeader === bid) this.endsAt = Math.max(this.endsAt, now + SOFT_CLOSE_MS);
+      this.phase = this.phaseFor(this.endsAt - now);
+    } else if (running) {
+      this.phase = this.phaseFor(this.endsAt - now);
+    }
+    await this.save();
+    if (live) await this.armAlarm(now);
+    else await this.state.storage.setAlarm(now + 1);
+    const state = this.stateMessage(now);
+    this.broadcast(state);
+    return state;
+  }
+
+  async persistRemovals() {
+    if (!this.env.DB || !this.pendingRemovals.length) return;
+    const pending = new Set(this.pendingRemovals);
+    const bids = this.bidLog.filter(bid => pending.has(bidKey(bid)) && bid.removal);
+    const stmt = this.env.DB.prepare(`INSERT OR IGNORE INTO bid_removals
+      (lot_id, bid_id, paddle, amount_lunas, bid_created_at, removed_at, removed_by, role, reason)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (let offset = 0; offset < bids.length; offset += 100) {
+      await this.env.DB.batch(bids.slice(offset, offset + 100).map(bid => stmt.bind(
+        this.lot.id, bidKey(bid), bid.paddle, bid.amountLunas, bid.ts,
+        bid.removal.removedAt, bid.removal.removedBy, bid.removal.role, bid.removal.reason
+      )));
+    }
+    const acknowledged = new Set(bids.map(bidKey));
+    this.pendingRemovals = this.pendingRemovals.filter(id => !acknowledged.has(id));
+    await this.save();
+  }
+
+  async handleRemoveBid(request) {
+    let body;
+    try { body = await request.json(); }
+    catch { return Response.json({ error: "Invalid removal request." }, { status: 400 }); }
+    try {
+      await this.removeBid(body);
+      await this.persistRemovals();
+      return Response.json({ ok: true, state: this.stateMessage() });
+    } catch (error) {
+      const statuses = { forbidden: 403, bid_not_found: 404, invalid_reason: 400, winning_bid_locked: 409, rate_limited: 429 };
+      return Response.json({ error: error instanceof RoomError ? error.message : "Bid removal could not be fully synchronized. Refresh and retry." }, { status: statuses[error.code] || 503 });
+    }
   }
 
   // ---------- websocket ----------
@@ -232,6 +318,9 @@ export class AuctionRoom {
     }
     if (url.pathname.endsWith("/seed")) {
       return this.handleSeed(request);
+    }
+    if (url.pathname.endsWith("/remove-bid") && request.method === "POST") {
+      return this.handleRemoveBid(request);
     }
 
     if (request.headers.get("Upgrade") !== "websocket") {
@@ -392,8 +481,12 @@ export class AuctionRoom {
   }
 
   stateMessage(now = Date.now()) {
+    const active = this.bidLog.filter(bid => !bid.removal);
+    const removed = this.bidLog.filter(bid => bid.removal);
+    const leader = highestActiveBid(active);
     return {
       type: "state",
+      revision: this.revision,
       lot: this.lot
         ? {
             id: this.lot.id,
@@ -413,7 +506,12 @@ export class AuctionRoom {
       currentBidLunas: this.currentBid,
       leadingPaddle: this.leading,
       minNextBidLunas: this.minNextBidLunasSafe(),
-      bids: this.bidLog.slice(-FEED_SIZE),
+      bids: active.slice(-FEED_SIZE).map(bid => ({ ...bid, id: bidKey(bid) })),
+      removedBids: removed.slice(-FEED_SIZE).map(bid => ({ ...bid, id: bidKey(bid) })),
+      bidCount: active.length,
+      removedBidCount: removed.length,
+      leadingBidId: leader ? bidKey(leader) : null,
+      archivePending: this.pendingRemovals.length > 0,
       connections: this.state.getWebSockets().length,
     };
   }

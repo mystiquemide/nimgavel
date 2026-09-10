@@ -8,7 +8,7 @@ Live community auctions inside [Nimiq Pay](https://www.nimiq.com/nimiq-pay). A h
 
 Browse the auction floor in any browser. To host or bid, use **Open in Nimiq Pay** on your phone, or scan the room's QR code. Allow the wallet and paddle requests, then enter a room.
 
-Hosting signs a one-time wallet challenge. Bids are free. Each bid during the final 30 seconds resets the remaining time to 30 seconds. When bidding ends, only the winning paddle gets the payment action.
+Hosting signs a one-time wallet challenge. Bids are free. Each bid during the final 30 seconds resets the remaining time to 30 seconds. When bidding ends, only the winning paddle gets the payment action. Bidders can withdraw a mistaken bid and hosts can remove bids with a required public reason; removals stay visible in the room's removal history, and the winning bid locks at close.
 
 Nimiq Pay handles signing and transfers without exposing private keys to the app. Payments include the lot's reference. The server checks that reference, transaction hash, network, recipient, amount, execution and 60 confirmations before showing a verified receipt. A recorded hash alone is not proof of payment.
 

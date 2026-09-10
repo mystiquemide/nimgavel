@@ -35,6 +35,16 @@ D1's `settled` status means a payment hash was recorded, not that payment was ve
 - Per-paddle cooldown uses persisted bid history; socket message counters and authorization expiry survive hibernation. Frames are capped at 4 KiB, and each room accepts at most 200 sockets. These controls do not establish Sybil resistance.
 - User text is escaped before HTML insertion. Requests have a streamed 320 KiB cap; photo data URIs have a separate 300000-character limit.
 
+## Bid removal
+
+Bidders can withdraw their own bids and hosts can remove bids in their lot, while the auction is live and after it closes. Removal requires a public reason and is recorded as a tombstone in `bid_removals`; original rows are kept. Rules:
+
+- A removed bid stops counting immediately. Removing the live leader recomputes the high bid from remaining bids and guarantees at least 30 more seconds, even if the deadline was further out.
+- After close, the winning bid and its payment receipt are locked. Only losing bids can be removed then. Removing every bid during a live auction means the lot passes without a winner.
+- Bidder withdrawal uses the paddle token. Host moderation uses a fresh wallet signature: `POST /api/lots/:id/authorize` exchanges a lot-scoped, single-use signed challenge for a host token. The challenge is bound to the lot and cannot create lots or authorize another lot.
+- Removed bids are excluded from the normal feed, leaderboard counts and winning calculations, but remain visible under the room's removal history. Removals that hit a D1 outage stay pending in the Durable Object and retry via alarm.
+- Bids are identified by `paddle-amountLunas-timestamp`, matching the unique archive index. Repeating a removal is idempotent and returns the original reason.
+
 ## REST API
 
 All endpoints use JSON and the same origin. Errors return `{ "error": "message" }` with a non-success status.
@@ -43,10 +53,12 @@ All endpoints use JSON and the same origin. Errors return `{ "error": "message" 
 |---|---|---|
 | GET | `/health` | Public database and network health |
 | GET | `/api/paddle?deviceId=...` | Device-scoped handle; returns paddle, alias and expiring token. Treat device IDs and tokens as private. |
-| POST | `/api/host/challenge` | `{hostAddress}` creates an expiring one-time challenge |
+| POST | `/api/host/challenge` | `{hostAddress}` creates an expiring one-time challenge. `{hostAddress, lotId}` creates a lot-control challenge for that lot's existing host |
 | POST | `/api/lots` | Wallet signature, challenge ID, host address, host paddle and paddle token, plus lot fields |
+| POST | `/api/lots/:id/authorize` | Lot-scoped signed challenge; returns a fresh host-control token |
+| POST | `/api/lots/:id/bids/:bidId/remove` | Bidder's paddle token (own bids) or host token with `{role, reason}`; idempotent replay returns the recorded state |
 | GET | `/api/lots?limit=50` | Independently bounded live, upcoming and results lists, at most 100 per category |
-| GET | `/api/lots/:id` | Public lot and most recent 100 archived bids |
+| GET | `/api/lots/:id` | Public lot, most recent 100 active archived bids, and removal history |
 | POST | `/api/lots/:id/start` | Lot-specific host token |
 | POST | `/api/lots/:id/settle` | Winner paddle token and transaction hash; idempotent for the same hash; rejected references can be corrected |
 | POST | `/api/lots/:id/verify` | Winner paddle token; verifies recorded payment |

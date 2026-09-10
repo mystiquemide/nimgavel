@@ -172,6 +172,7 @@ export function renderResults(container) {
                 </div>
 
                 ${reason}
+                <a class="btn-explorer-link" href="/room/${encodeURIComponent(item.id)}">View bids and removal history</a>
                 ${tx}
               </div>
             </article>`;

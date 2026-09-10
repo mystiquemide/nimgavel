@@ -18,7 +18,7 @@ Nimgavel serves its frontend and API from one Cloudflare Worker. It requires a D
 ## Deploy an instance
 
 1. Install dependencies with `npm ci` and authenticate Wrangler to your own account.
-2. Create a D1 database and update its ID in `wrangler.jsonc`. When using a different domain, update the WebSocket origin in `public/_headers` and the app's public URLs. Apply migrations with `npm run db:migrate:remote` only against the intended instance.
+2. Create a D1 database and update its ID in `wrangler.jsonc`. When using a different domain, update the WebSocket origin in `public/_headers` and the app's public URLs. Apply migrations with `npm run db:migrate:remote` only against the intended instance. Migration `0006_bid_removals` must be applied before deploying the bid-removal Worker code; the new query filters read `bid_removals`.
 3. Set the signing secret with `npx wrangler secret put NIMGAVEL_SECRET`. Configure the network and build ID in Worker settings.
 4. Run `npm run build:web`, local tests, `npm run worker:check` and `npm audit`.
 5. Deploy with `npm run deploy -- --keep-vars` when the release is approved. The frontend must be built first.

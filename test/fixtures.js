@@ -15,9 +15,9 @@ export function makePaddle() {
   return api(`/api/paddle?deviceId=${crypto.randomUUID()}`);
 }
 
-export async function makeLot(spec = {}, host) {
+export async function makeLot(spec = {}, host, keyPair) {
   host ||= await makePaddle();
-  const key = KeyPair.generate();
+  const key = keyPair || KeyPair.generate();
   const hostAddress = key.toAddress().toUserFriendlyAddress();
   const { challenge } = await api("/api/host/challenge", { method: "POST", body: JSON.stringify({ hostAddress }) });
   const created = await api("/api/lots", {
@@ -28,7 +28,7 @@ export async function makeLot(spec = {}, host) {
       challengeId: challenge.id, publicKey: key.publicKey.toHex(), signature: key.sign(Hash.computeSha256(encodeNimiqSignedMessage(challenge.message))).toHex()
     })
   });
-  return { ...created, host };
+  return { ...created, host, keyPair: key };
 }
 
 export function startAuction(created) {

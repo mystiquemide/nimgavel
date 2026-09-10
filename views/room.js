@@ -1,7 +1,9 @@
-import { getLot, getRoomState, settleLot, verifySettlement, ApiError } from "../lib/api.js";
+import { getLot, getRoomState, settleLot, verifySettlement, createHostChallenge, authorizeLotHost, removeBid, ApiError } from "../lib/api.js";
+import { bidKey } from "../lib/bids.js";
 import {
   formatNim,
   sendPayment,
+  signMessage,
   WalletCancelledError
 } from "../lib/nimiq.js";
 import { session, bootWallet, resetBoot, getBootState, isSpectate, walletReady } from "../lib/session.js";
@@ -12,6 +14,7 @@ const APP_ORIGIN = "https://nimgavel.artistic-chip.workers.dev";
 
 export function renderRoom(container, lotId) {
   let disposed = false;
+  let removalDialog = null;
   const state = {
     phase: "loading", // loading | live | going_once | going_twice | sold | passed | settled | gone
     lotTitle: null,
@@ -25,6 +28,15 @@ export function renderRoom(container, lotId) {
     minNext: 0,
     leading: null, // { paddle, alias }
     bids: [],
+    removedBids: [],
+    bidCount: 0,
+    removedBidCount: 0,
+    leadingBidId: null,
+    showRemovals: false,
+    hostToken: null,
+    authorizingHost: false,
+    archivePending: false,
+    revision: -1,
     connections: 0,
     endsAt: null,
     startedAt: null,
@@ -172,14 +184,21 @@ export function renderRoom(container, lotId) {
               <div class="deck-feed-section">
                 <div class="feed-header-row">
                   <span class="feed-title">LIVE BID STREAM</span>
-                  <span class="feed-count">${state.bids.length} bids · ${state.connections} paddle${state.connections === 1 ? "" : "s"} in room</span>
+                  <span class="feed-count">${state.bidCount} active bids · ${state.connections} connection${state.connections === 1 ? "" : "s"}</span>
                 </div>
+                ${isHostWallet() ? `<button type="button" class="bid-remove-button" id="enable-host-controls" ${state.authorizingHost ? "disabled" : ""}>${state.authorizingHost ? "Waiting for wallet…" : state.hostToken ? "Refresh host controls" : "Enable host controls"}</button>` : ""}
+                <p class="bid-removal-note">Withdrawals and host removals stay in public history. The winning bid is locked after close.</p>
                 <div class="feed-list-wrap" id="room-feed-list" role="log" aria-live="polite">
                   ${state.bids.length ? state.bids.map(renderFeedRow).join("")
                     : state.socketStatus === "open"
                       ? `<div class="feed-empty">No bids yet. The opening bid is ${formatNim(state.minNext || state.startPrice)} NIM.</div>`
                       : `<div class="feed-empty">Connecting to the room. Live bids stream in here.</div>`}
                 </div>
+                ${state.bidCount > 100 ? `<p class="bid-removal-note">Showing the latest 100 active bids.</p>` : ""}
+                ${state.removedBidCount ? `
+                  <button type="button" class="bid-remove-button" id="toggle-removal-history" aria-expanded="${state.showRemovals}" aria-controls="removal-history">${state.showRemovals ? "Hide" : "View"} removal history (${state.removedBidCount})</button>
+                  <div id="removal-history" ${state.showRemovals ? "" : "hidden"}>${state.removedBids.map(renderRemovedBid).join("")}</div>` : ""}
+                ${state.archivePending ? `<p class="bid-removal-note" role="status">Removal history is syncing to the archive.</p>` : ""}
               </div>
 
               <!-- Action Paddle Deck -->
@@ -218,9 +237,112 @@ export function renderRoom(container, lotId) {
         <div class="feed-row-right">
           <span class="feed-amount">${formatNim(bid.amountLunas)} NIM</span>
           <span class="feed-time">${formatAgo(bid.ts)}</span>
+          ${canRemoveBid(bid) ? `<button type="button" class="bid-remove-button" data-bid-remove="${escapeAttr(bid.id || bidKey(bid))}" aria-label="${own ? "Withdraw" : "Remove"} ${formatNim(bid.amountLunas)} NIM bid from paddle ${bid.paddle}">${own && !auctionClosed() ? "Withdraw" : "Remove"}</button>` : ""}
+          ${auctionClosed() && (bid.id || bidKey(bid)) === state.leadingBidId ? `<span class="bid-removal-note">Winning bid locked</span>` : ""}
         </div>
       </div>
     `;
+  }
+
+  function isHostWallet() {
+    const normalize = value => String(value || "").replace(/\s/g, "").toUpperCase();
+    return walletReady() && state.hostAddress && normalize(session.account) === normalize(state.hostAddress);
+  }
+
+  function auctionClosed() {
+    return ["sold", "settled", "passed"].includes(state.phase) || remaining() === 0;
+  }
+
+  function canRemoveBid(bid) {
+    if (bid.removal || !walletReady()) return false;
+    const winning = (bid.id || bidKey(bid)) === state.leadingBidId || (state.sold?.winningPaddle === bid.paddle && state.sold?.amountLunas === bid.amountLunas);
+    if (auctionClosed() && winning) return false;
+    return (session.paddle === bid.paddle && session.paddleToken) || (isHostWallet() && state.hostToken);
+  }
+
+  function renderRemovedBid(bid) {
+    const removal = bid.removal;
+    return `<article class="bid-removal-history-row">
+      <p>${formatNim(bid.amountLunas)} NIM from Paddle #${bid.paddle}</p>
+      <p>${removal.role === "host" ? "Removed by host" : "Withdrawn by bidder"} · ${escapeHtml(new Date(removal.removedAt).toLocaleString())}</p>
+      <p>${escapeHtml(removal.reason)}</p>
+    </article>`;
+  }
+
+  async function enableHostControls() {
+    if (state.authorizingHost || !isHostWallet()) return;
+    state.authorizingHost = true;
+    render();
+    let errorMessage;
+    try {
+      const { challenge } = await createHostChallenge(state.hostAddress, lotId);
+      const signed = await signMessage(challenge.message);
+      const authorized = await authorizeLotHost(lotId, { challengeId: challenge.id, ...signed });
+      state.hostToken = authorized.hostToken;
+    } catch (error) {
+      if (!(error instanceof WalletCancelledError)) errorMessage = error.message || "Host authorization failed.";
+    }
+    state.authorizingHost = false;
+    render();
+    if (errorMessage) showToast(errorMessage);
+  }
+
+  function openBidRemoval(bid) {
+    if (removalDialog || !canRemoveBid(bid)) return;
+    const own = session.paddle === bid.paddle;
+    const role = own ? "bidder" : "host";
+    const dialog = document.createElement("dialog");
+    removalDialog = dialog;
+    dialog.className = "bid-removal-dialog";
+    dialog.setAttribute("aria-labelledby", "bid-removal-title");
+    dialog.innerHTML = `<form id="bid-removal-form">
+      <h2 id="bid-removal-title">${own && !auctionClosed() ? "Withdraw" : "Remove"} this bid?</h2>
+      <p>${formatNim(bid.amountLunas)} NIM from Paddle #${bid.paddle}.</p>
+      <p>The bid will no longer count, but its removal remains public. Your other active bids still count. Removing the live leader gives everyone at least 30 seconds to respond.</p>
+      <label for="bid-removal-reason">Reason (public)</label>
+      <textarea class="form-textarea" id="bid-removal-reason" name="reason" required maxlength="280" rows="3" placeholder="Explain the mistake or moderation reason"></textarea>
+      <p id="bid-removal-error" role="alert"></p>
+      <div class="bid-removal-actions">
+        <button type="button" class="bid-remove-button" id="cancel-bid-removal">Keep bid</button>
+        <button type="submit" class="bid-remove-button bid-remove-confirm" id="confirm-bid-removal">Confirm removal</button>
+      </div>
+    </form>`;
+    document.body.appendChild(dialog);
+    let submitting = false;
+    const close = () => {
+      dialog.close();
+      dialog.remove();
+      removalDialog = null;
+      if (!disposed) container.querySelector("#room-feed-list button, #enable-host-controls")?.focus();
+    };
+    dialog.querySelector("#cancel-bid-removal").addEventListener("click", close);
+    dialog.addEventListener("cancel", event => { event.preventDefault(); if (!submitting) close(); });
+    dialog.querySelector("form").addEventListener("submit", async event => {
+      event.preventDefault();
+      if (submitting) return;
+      const reason = dialog.querySelector("textarea").value.trim();
+      const errorSlot = dialog.querySelector("#bid-removal-error");
+      if (!reason) { errorSlot.textContent = "Enter a public reason."; return; }
+      submitting = true;
+      dialog.querySelectorAll("button").forEach(button => { button.disabled = true; });
+      errorSlot.textContent = "";
+      try {
+        const response = await removeBid(lotId, bid.id || bidKey(bid), { role, token: role === "host" ? state.hostToken : session.paddleToken, reason });
+        if (disposed) return;
+        onMessage(response.state);
+        close();
+        showToast("Bid removed. Its history is preserved.");
+      } catch (error) {
+        if (disposed) return;
+        if (role === "host" && error.status === 401) state.hostToken = null;
+        errorSlot.textContent = error.message || "The removal could not be confirmed. Refresh and retry.";
+        submitting = false;
+        dialog.querySelectorAll("button").forEach(button => { button.disabled = false; });
+        render();
+      }
+    });
+    dialog.showModal();
+    dialog.querySelector("#cancel-bid-removal").focus();
   }
 
   function wsLabel() {
@@ -494,6 +616,12 @@ export function renderRoom(container, lotId) {
   }
 
   function wireActionButtons() {
+    container.querySelector("#enable-host-controls")?.addEventListener("click", enableHostControls);
+    container.querySelector("#toggle-removal-history")?.addEventListener("click", () => { state.showRemovals = !state.showRemovals; render(); });
+    container.querySelectorAll("[data-bid-remove]").forEach(button => button.addEventListener("click", () => {
+      const bid = state.bids.find(bid => (bid.id || bidKey(bid)) === button.dataset.bidRemove);
+      if (bid) openBidRemoval(bid);
+    }));
     const raiseBtn = container.querySelector("#btn-raise-paddle");
     if (raiseBtn && raiseBtn.tagName === "BUTTON") {
       raiseBtn.addEventListener("click", () => placeBid(state.minNext));
@@ -553,6 +681,10 @@ export function renderRoom(container, lotId) {
 
   function onMessage(message) {
     if (!message || typeof message !== "object") return;
+    if (Number.isSafeInteger(message.revision)) {
+      if (message.revision < state.revision) return;
+      state.revision = message.revision;
+    }
     if (typeof message.serverNow === "number") state.clockOffset = message.serverNow - Date.now();
     if (typeof message.endsAt === "number") state.endsAt = message.endsAt;
     switch (message.type) {
@@ -566,6 +698,11 @@ export function renderRoom(container, lotId) {
         state.minNext = message.minNextBidLunas || 0;
         state.leading = normalizeLeading(message.leadingPaddle, message.leadingAlias);
         state.bids = (message.bids || []).slice().reverse();
+        state.removedBids = (message.removedBids || []).slice().reverse();
+        state.bidCount = message.bidCount ?? state.bids.length;
+        state.removedBidCount = message.removedBidCount ?? state.removedBids.length;
+        state.leadingBidId = message.leadingBidId || null;
+        state.archivePending = Boolean(message.archivePending);
         state.connections = message.connections || 0;
         if (message.lot) {
           state.minIncrement = message.lot.minIncrementLunas || state.minIncrement;
@@ -584,15 +721,19 @@ export function renderRoom(container, lotId) {
         }
         break;
       case "bid":
+        state.leadingBidId = message.id || bidKey(message);
+        state.bidCount += 1;
         state.currentBid = message.amountLunas;
         state.leading = { paddle: message.paddle, alias: message.alias || "" };
         state.minNext = message.amountLunas + state.minIncrement;
         state.bids.unshift({
+          id: message.id || bidKey(message),
           paddle: message.paddle,
           alias: message.alias || "",
           amountLunas: message.amountLunas,
           ts: message.ts || Date.now()
         });
+        state.bids = state.bids.slice(0, 100);
         break;
       case "phase":
         state.phase = message.phase;
@@ -722,6 +863,10 @@ export function renderRoom(container, lotId) {
       const detail = await getLot(lotId);
       if (detail?.lot?.id) {
         const lot = detail.lot;
+        state.bids = (detail.bids || []).map(bid => ({ ...bid, ts: bid.createdAt }));
+        state.removedBids = (detail.removedBids || []).map(bid => ({ ...bid, ts: bid.createdAt }));
+        state.bidCount = state.bids.length;
+        state.removedBidCount = state.removedBids.length;
         state.hostAddress = lot.hostAddress;
         state.hostPaddle = lot.hostPaddle;
         state.minIncrement = lot.minIncrementLunas || 0;
@@ -792,6 +937,8 @@ export function renderRoom(container, lotId) {
 
   return function cleanup() {
     disposed = true;
+    removalDialog?.remove();
+    removalDialog = null;
     clearInterval(state.tickTimer);
     if (state.toastTimer) clearTimeout(state.toastTimer);
     if (state.socket) state.socket.close();
