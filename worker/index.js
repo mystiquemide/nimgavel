@@ -521,8 +521,20 @@ function maskPaddle(paddle) {
   return `${digits[0]}${"•".repeat(digits.length - 2)}${digits.slice(-1)}`;
 }
 
+async function supportsBidRemovals(database) {
+  try {
+    await database.prepare("SELECT 1 FROM bid_removals LIMIT 1").first();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const BID_REMOVAL_FILTER = `NOT EXISTS (SELECT 1 FROM bid_removals r WHERE r.lot_id = b.lot_id AND r.paddle = b.paddle AND r.amount_lunas = b.amount_lunas AND r.bid_created_at = b.created_at)`;
+
 async function leaderboard(env) {
   const database = requireDb(env);
+  const filter = await supportsBidRemovals(database) ? `WHERE ${BID_REMOVAL_FILTER}` : "";
 
   const bidders = await database.prepare(
     `SELECT p.paddle AS paddle, p.alias AS alias,
@@ -531,7 +543,7 @@ async function leaderboard(env) {
             (SELECT COUNT(*) FROM lots l WHERE l.winning_paddle = p.paddle AND l.status IN ('sold', 'settled')) AS wins
      FROM paddles p
      JOIN bids b ON b.paddle = p.paddle
-     WHERE NOT EXISTS (SELECT 1 FROM bid_removals r WHERE r.lot_id = b.lot_id AND r.paddle = b.paddle AND r.amount_lunas = b.amount_lunas AND r.bid_created_at = b.created_at)
+     ${filter}
      GROUP BY p.paddle, p.alias
      ORDER BY wins DESC, bids DESC, p.paddle ASC
      LIMIT 25`
@@ -584,18 +596,21 @@ async function getLot(env, lotId) {
   const row = await selectLot(database, lotId);
   if (!row) throw new ApiError(404, "Lot not found.");
 
+  const removalsReady = await supportsBidRemovals(database);
   const result = await database.prepare(
     `SELECT b.paddle, p.alias, b.amount_lunas, b.created_at
      FROM bids b
      LEFT JOIN paddles p ON p.paddle = b.paddle
-     WHERE b.lot_id = ? AND NOT EXISTS (SELECT 1 FROM bid_removals r WHERE r.lot_id = b.lot_id AND r.paddle = b.paddle AND r.amount_lunas = b.amount_lunas AND r.bid_created_at = b.created_at)
+     WHERE b.lot_id = ?${removalsReady ? ` AND ${BID_REMOVAL_FILTER}` : ""}
      ORDER BY b.id DESC
      LIMIT 100`
   ).bind(lotId).all();
 
-  const removed = await database.prepare(`SELECT r.*, p.alias FROM bid_removals r
-    LEFT JOIN paddles p ON p.paddle = r.paddle WHERE r.lot_id = ?
-    ORDER BY r.removed_at DESC, r.bid_id ASC LIMIT 100`).bind(lotId).all();
+  const removed = removalsReady
+    ? await database.prepare(`SELECT r.*, p.alias FROM bid_removals r
+      LEFT JOIN paddles p ON p.paddle = r.paddle WHERE r.lot_id = ?
+      ORDER BY r.removed_at DESC, r.bid_id ASC LIMIT 100`).bind(lotId).all()
+    : { results: [] };
   return json({
     lot: toPublicLot(row),
     bids: (result?.results || []).map(toPublicBid),
