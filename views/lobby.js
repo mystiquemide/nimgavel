@@ -84,7 +84,7 @@ export function renderLobby(container) {
           <div class="lobby-bid-box">
             <div class="lobby-bid-header">
               <span class="lobby-bid-label">${status === "upcoming" ? "STARTING RESERVE" : "CURRENT HIGH BID"}</span>
-              <span class="lobby-bids-count">${status === "upcoming" ? `${connections} paddle${connections === 1 ? "" : "s"} waiting` : `${bidCount} bids · ${connections} in room`}</span>
+              <span class="lobby-bids-count">${status === "upcoming" ? `${connections} paddle${connections === 1 ? "" : "s"} in room` : `${bidCount} bids · ${connections} paddle${connections === 1 ? "" : "s"} in room`}</span>
             </div>
             <div class="lobby-bid-amount-row">
               <span class="lobby-bid-nim">${formatNim(bid)} NIM</span>
@@ -314,7 +314,7 @@ export function renderLobby(container) {
       const count = card.querySelector(".lobby-bids-count");
       if (count) {
         const bidCount = Array.isArray(room.bids) ? room.bids.length : 0;
-        count.textContent = `${bidCount} bids · ${room.connections} in room`;
+        count.textContent = `${bidCount} bids · ${room.connections} paddle${room.connections === 1 ? "" : "s"} in room`;
       }
       const leader = card.querySelector(".lobby-bid-leader");
       if (leader) {

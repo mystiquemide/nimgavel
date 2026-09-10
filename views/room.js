@@ -169,7 +169,7 @@ export function renderRoom(container, lotId) {
               <div class="deck-feed-section">
                 <div class="feed-header-row">
                   <span class="feed-title">LIVE BID STREAM</span>
-                  <span class="feed-count">${state.bids.length} bids · ${state.connections} paddle${state.connections === 1 ? "" : "s"}</span>
+                  <span class="feed-count">${state.bids.length} bids · ${state.connections} paddle${state.connections === 1 ? "" : "s"} in room</span>
                 </div>
                 <div class="feed-list-wrap" id="room-feed-list" role="log" aria-live="polite">
                   ${state.bids.length ? state.bids.map(renderFeedRow).join("")

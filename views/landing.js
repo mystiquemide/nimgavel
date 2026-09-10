@@ -31,6 +31,7 @@ export function renderLanding(container) {
               <span>Host an Auction</span>
             </a>
           </div>
+          <p class="hero-boundary-note">Browse on the web. Bid and host inside Nimiq Pay.</p>
         </div>
 
         <!-- Featured Live Lot Card Below -->
@@ -171,7 +172,7 @@ export function renderLanding(container) {
       </div>
 
       <div class="footer-bottom-strip">
-        <p>2026 Nimgavel. Made for the Nimiq ecosystem. No cookies, no tracking scripts, no platform fee.</p>
+        <p>© 2026 Nimgavel. Made for the Nimiq ecosystem. No cookies, no tracking scripts, no platform fee.</p>
       </div>
     </footer>
   `;

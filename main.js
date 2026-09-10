@@ -22,7 +22,6 @@ function initApp() {
     const isLanding = path === "/" || path === "";
 
     app.innerHTML = `
-      <a class="skip-link" href="#main-content">Skip to content</a>
       <div class="ambient-glow" aria-hidden="true"></div>
       <div id="nav-slot"></div>
       <main class="shell" id="main-content"></main>
