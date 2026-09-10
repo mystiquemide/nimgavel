@@ -1195,55 +1195,43 @@ button {
   transform: none !important;
 }
 
-body.animate-ready [data-animate]:not(.in-view),
-body.animate-ready [data-animate-child]:not(.in-view) {
-  opacity: 0;
-  will-change: opacity, transform;
+/* Entrance animation is an ENHANCEMENT, never a gate: content is fully
+   visible by default; the rise animation only plays when the observer
+   confirms a healthy compositor. Broken GPU/driver/RDP setups that fail
+   to paint composited layers must still show every card. */
+@keyframes nimgavel-rise {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nimgavel-rise-scale {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nimgavel-rise-left {
+  from { opacity: 0; transform: translateX(-36px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nimgavel-rise-right {
+  from { opacity: 0; transform: translateX(36px); }
+  to { opacity: 1; transform: none; }
 }
 
-[data-animate="fade-up"] {
-  transform: translateY(36px);
+body.animate-ready [data-animate].in-view { animation: nimgavel-rise 0.85s cubic-bezier(0.22, 1, 0.36, 1); }
+body.animate-ready [data-animate="scale-in"].in-view { animation: nimgavel-rise-scale 0.85s cubic-bezier(0.22, 1, 0.36, 1); }
+body.animate-ready [data-animate="fade-left"].in-view { animation: nimgavel-rise-left 0.85s cubic-bezier(0.22, 1, 0.36, 1); }
+body.animate-ready [data-animate="fade-right"].in-view { animation: nimgavel-rise-right 0.85s cubic-bezier(0.22, 1, 0.36, 1); }
+body.animate-ready [data-animate-stagger].in-view > [data-animate-child] {
+  animation: nimgavel-rise 0.85s cubic-bezier(0.22, 1, 0.36, 1);
 }
-
-[data-animate="fade-left"] {
-  transform: translateX(-36px);
-}
-
-[data-animate="fade-right"] {
-  transform: translateX(36px);
-}
-
-[data-animate="scale-in"] {
-  transform: scale(0.92);
-}
-
-[data-animate-child] {
-  transform: translateY(30px);
-}
-
-[data-animate].in-view {
-  opacity: 1;
-  transform: translateY(0) translateX(0) scale(1);
-  transition: opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1), transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-[data-animate-stagger].in-view > [data-animate-child] {
-  opacity: 1;
-  transform: translateY(0);
-  transition: opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1), transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-[data-animate-stagger].in-view > [data-animate-child]:nth-child(1) { transition-delay: 0.06s; }
-[data-animate-stagger].in-view > [data-animate-child]:nth-child(2) { transition-delay: 0.18s; }
-[data-animate-stagger].in-view > [data-animate-child]:nth-child(3) { transition-delay: 0.30s; }
-[data-animate-stagger].in-view > [data-animate-child]:nth-child(4) { transition-delay: 0.42s; }
+body.animate-ready [data-animate-stagger].in-view > [data-animate-child]:nth-child(1) { animation-delay: 0.06s; }
+body.animate-ready [data-animate-stagger].in-view > [data-animate-child]:nth-child(2) { animation-delay: 0.18s; }
+body.animate-ready [data-animate-stagger].in-view > [data-animate-child]:nth-child(3) { animation-delay: 0.30s; }
+body.animate-ready [data-animate-stagger].in-view > [data-animate-child]:nth-child(4) { animation-delay: 0.42s; }
 
 @media (prefers-reduced-motion: reduce) {
   [data-animate],
   [data-animate-child] {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
+    animation: none !important;
   }
 }
 
@@ -3694,3 +3682,6 @@ body.animate-ready [data-animate-child]:not(.in-view) {
 @media (max-width: 520px) {
   .brand-badge { display: none; }
 }
+
+/* cache-bust 2026-09-10T13:26Z */
+.cb-v2-2026091013 { --cache-bust: 2; }
