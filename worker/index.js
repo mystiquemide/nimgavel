@@ -103,6 +103,10 @@ async function routeRequest(request, env, url) {
     return listLots(env, url);
   }
 
+  if (request.method === "GET" && url.pathname === "/api/leaderboard") {
+    return leaderboard(env);
+  }
+
   const lotActionMatch = url.pathname.match(/^\/api\/lots\/([^/]+)\/(start|settle|verify)$/);
   if (lotActionMatch) {
     const lotId = decodeLotId(lotActionMatch[1]);
@@ -479,6 +483,56 @@ async function getHostChallenge(database, challengeId) {
   return challenge;
 }
 
+// Public leaderboard: aggregate paddle activity across the floor. Paddle
+// numbers are partially masked in the response itself, so the public list
+// cannot be used to build a full cross-auction identity index.
+function maskPaddle(paddle) {
+  const digits = String(paddle);
+  if (digits.length <= 2) return `•${digits.slice(-1)}`;
+  return `${digits[0]}${"•".repeat(digits.length - 2)}${digits.slice(-1)}`;
+}
+
+async function leaderboard(env) {
+  const database = requireDb(env);
+
+  const bidders = await database.prepare(
+    `SELECT p.paddle AS paddle, p.alias AS alias,
+            COUNT(*) AS bids,
+            COUNT(DISTINCT b.lot_id) AS rooms
+     FROM paddles p
+     JOIN bids b ON b.paddle = p.paddle
+     GROUP BY p.paddle, p.alias
+     ORDER BY bids DESC, p.paddle ASC
+     LIMIT 100`
+  ).all();
+
+  const winners = await database.prepare(
+    `SELECT winning_paddle AS paddle,
+            COUNT(*) AS wins,
+            COALESCE(SUM(winning_bid_lunas), 0) AS won_lunas
+     FROM lots
+     WHERE winning_paddle IS NOT NULL AND status IN ('sold', 'settled')
+     GROUP BY winning_paddle`
+  ).all();
+
+  const winMap = new Map((winners.results || []).map((row) => [row.paddle, row]));
+  const rows = (bidders.results || []).map((row) => {
+    const win = winMap.get(row.paddle);
+    return {
+      paddle: maskPaddle(row.paddle),
+      alias: row.alias,
+      bids: row.bids,
+      rooms: row.rooms,
+      wins: win ? win.wins : 0,
+      wonLunas: win ? win.won_lunas : 0
+    };
+  });
+
+  rows.sort((a, b) => (b.wins - a.wins) || (b.bids - a.bids) || a.alias.localeCompare(b.alias));
+
+  return json({ ok: true, leaderboard: rows.slice(0, 25) });
+}
+
 async function listLots(env, url) {
   const database = requireDb(env);
   const limit = parseLimit(url.searchParams.get("limit"));
@@ -839,15 +893,24 @@ function parseLotInput(body, hostAddress) {
   const imageValue = body.imageUrl ?? body.image_url ?? null;
   let imageUrl = null;
   if (imageValue !== null && imageValue !== "") {
-    if (typeof imageValue !== "string" || imageValue.length > 2_048) {
-      throw new ApiError(400, "Image URL must be at most 2048 characters.");
+    if (typeof imageValue !== "string" || imageValue.length > 300_000) {
+      throw new ApiError(400, "Image must be at most 300,000 characters.");
     }
-    try {
-      const parsed = new URL(imageValue);
-      if (parsed.protocol !== "https:") throw new Error("https required");
-      imageUrl = parsed.toString();
-    } catch {
-      throw new ApiError(400, "Image URL must use https.");
+    if (imageValue.startsWith("data:image/")) {
+      // Uploaded photos arrive as client-downscaled data URIs; hosts can
+      // also pass any public https image link.
+      if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(imageValue)) {
+        throw new ApiError(400, "Image must be a base64 JPEG, PNG, or WebP.");
+      }
+      imageUrl = imageValue;
+    } else {
+      try {
+        const parsed = new URL(imageValue);
+        if (parsed.protocol !== "https:") throw new Error("https required");
+        imageUrl = parsed.toString();
+      } catch {
+        throw new ApiError(400, "Image URL must use https.");
+      }
     }
   }
 

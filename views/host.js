@@ -8,6 +8,7 @@ import {
 import { formatNim, signMessage, getAccount, WalletCancelledError } from "../lib/nimiq.js";
 import { session, bootWallet, resetBoot, getBootState, isSpectate, walletReady } from "../lib/session.js";
 import { storeLinksMarkup, walletTroubleCard } from "../lib/qr.js";
+import { fileToLotImage } from "../lib/image.js";
 import { escapeHtml, escapeAttr, shortAddress } from "./room.js";
 
 const myLotsKey = "nimgavel.myLots"; // lotId -> { hostToken, savedAt }
@@ -193,17 +194,37 @@ export function renderHost(container) {
                     />
                   </div>
 
-                  <!-- Item Photograph URL -->
+                  <!-- Item Photograph Upload -->
                   <div class="form-group">
-                    <label for="lot-image-input" class="form-label">Item Photograph (https link)</label>
+                    <label for="lot-photo-input" class="form-label">Item Photograph</label>
+                    <div
+                      class="photo-dropzone"
+                      id="photo-dropzone"
+                      role="button"
+                      tabindex="0"
+                      aria-label="Upload a photo of your item"
+                    >
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <rect x="3" y="6" width="18" height="14" rx="3"></rect>
+                        <circle cx="12" cy="13" r="3.5"></circle>
+                        <path d="M9 6l1.2-2h3.6L15 6"></path>
+                      </svg>
+                      <span class="dz-title" id="dz-title">Tap to add a photo</span>
+                      <span class="dz-sub">JPEG, PNG, or WebP. Resized on your device before upload.</span>
+                    </div>
                     <input
-                      type="url"
-                      id="lot-image-input"
-                      name="imageUrl"
-                      class="form-input"
-                      placeholder="https://images.unsplash.com/photo-…"
+                      type="file"
+                      id="lot-photo-input"
+                      accept="image/jpeg,image/png,image/webp"
+                      hidden
                     />
-                    <p class="dropzone-sub-text">Any public https image link works. Leave empty for the gavel crest.</p>
+                    <div class="photo-selected" id="photo-selected" hidden>
+                      <img id="photo-selected-thumb" alt="Selected item photo preview" />
+                      <div class="photo-selected-row">
+                        <span class="dz-sub" id="photo-selected-note"></span>
+                        <button type="button" class="btn-remove-photo" id="btn-remove-photo">Remove photo</button>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- Reserve Price & Increment with Ghost Placeholders -->
@@ -376,7 +397,6 @@ export function renderHost(container) {
 
     // Live preview wiring
     const titleInput = container.querySelector("#lot-title-input");
-    const imageInput = container.querySelector("#lot-image-input");
     const priceInput = container.querySelector("#lot-price-input");
     const incInput = container.querySelector("#lot-inc-input");
 
@@ -387,11 +407,59 @@ export function renderHost(container) {
       });
     }
 
-    if (imageInput) {
-      imageInput.addEventListener("input", (e) => {
-        state.imageUrl = e.target.value.trim();
+    // Photo upload: pick or drop a file, downscale on-device, preview it.
+    const dropzone = container.querySelector("#photo-dropzone");
+    const fileInput = container.querySelector("#lot-photo-input");
+    if (dropzone && fileInput) {
+      const openPicker = () => fileInput.click();
+      dropzone.addEventListener("click", openPicker);
+      dropzone.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPicker(); }
+      });
+      dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("dz-drag"); });
+      dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dz-drag"));
+      dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dz-drag");
+        const file = e.dataTransfer?.files?.[0];
+        if (file) void handlePhoto(file);
+      });
+      fileInput.addEventListener("change", () => {
+        const file = fileInput.files?.[0];
+        if (file) void handlePhoto(file);
+      });
+
+      async function handlePhoto(file) {
+        try {
+          const dataUri = await fileToLotImage(file);
+          state.imageUrl = dataUri;
+          const selected = container.querySelector("#photo-selected");
+          const thumb = container.querySelector("#photo-selected-thumb");
+          const note = container.querySelector("#photo-selected-note");
+          if (thumb) thumb.src = dataUri;
+          if (note) {
+            const kb = Math.round(dataUri.length * 0.75 / 1024);
+            note.textContent = `Attached, about ${kb} KB after resizing.`;
+          }
+          if (selected) selected.hidden = false;
+          if (dropzone) dropzone.hidden = true;
+          const previewImg = container.querySelector("#preview-img");
+          if (previewImg) previewImg.src = dataUri;
+        } catch (error) {
+          state.formError = error.message || "That photo could not be read.";
+          render();
+        }
+      }
+
+      const removeBtn = container.querySelector("#btn-remove-photo");
+      if (removeBtn) removeBtn.addEventListener("click", () => {
+        state.imageUrl = "";
+        if (fileInput) fileInput.value = "";
+        const selected = container.querySelector("#photo-selected");
+        if (selected) selected.hidden = true;
+        if (dropzone) dropzone.hidden = false;
         const previewImg = container.querySelector("#preview-img");
-        if (previewImg) previewImg.src = state.imageUrl || defaultPhoto;
+        if (previewImg) previewImg.src = defaultPhoto;
       });
     }
 
@@ -547,7 +615,9 @@ export function renderHost(container) {
     const durationSec = Math.round(Number(form.get("duration")));
     const title = String(form.get("title") || "").trim();
     const description = String(form.get("desc") || "").trim();
-    const imageUrl = String(form.get("imageUrl") || "").trim();
+    // The photo travels as a downscaled data URI prepared by the picker;
+    // no URL field exists anymore.
+    const imageUrl = state.imageUrl || "";
 
     const submitBtn = container.querySelector("#btn-submit-lot span");
     if (submitBtn) submitBtn.textContent = "Waiting for wallet signature…";

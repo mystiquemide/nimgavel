@@ -3865,3 +3865,59 @@ body.animate-ready [data-animate-stagger].in-view > [data-animate-child]:nth-chi
 .doc-list li { font-size: 15.5px; line-height: 1.6; color: var(--ink-muted); }
 .doc-store-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
 .doc-store-row a { color: var(--green-bold); font-weight: 600; text-decoration: underline; }
+
+/* ===== Photo upload dropzone + leaderboard ===== */
+.photo-dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 26px 18px; cursor: pointer;
+  background: var(--canvas-card);
+  border: 2px dashed var(--ink-muted);
+  border-radius: 16px; color: var(--ink);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  text-align: center;
+}
+.photo-dropzone:hover, .photo-dropzone:focus-visible, .photo-dropzone.dz-drag {
+  background: var(--gold-wheat); border-color: var(--ink);
+}
+.dz-title { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+.dz-sub { font-size: 12px; color: var(--ink-muted); }
+.photo-selected { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.photo-selected img {
+  width: 100%; aspect-ratio: 16/10; object-fit: cover;
+  border: 2px solid var(--ink); border-radius: 16px; background: var(--surface-2);
+}
+.photo-selected-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.btn-remove-photo {
+  min-height: 40px; padding: 8px 14px;
+  background: none; border: 1.5px dashed var(--ink); border-radius: 999px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--ink); cursor: pointer;
+}
+.btn-remove-photo:hover { background: var(--tint-coral); }
+
+/* Leaderboard */
+.lb-list { display: flex; flex-direction: column; gap: 10px; }
+.lb-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 18px;
+  background: var(--canvas-card);
+  border: 1.5px dashed var(--ink-muted);
+  border-radius: 16px;
+}
+.lb-row.lb-gold { background: var(--gold-wheat); border-color: var(--ink); }
+.lb-row.lb-wheat { background: #FAF0CE; border-color: var(--ink-muted); }
+.lb-row.lb-green { background: #EBF7E6; border-color: var(--green-bold); }
+.lb-rank {
+  font-family: var(--font-display); font-weight: 800; font-size: 22px;
+  min-width: 34px; text-align: center; color: var(--ink);
+}
+.lb-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lb-alias { font-family: var(--font-display); font-weight: 800; font-size: 17px; color: var(--ink); }
+.lb-paddle { font-size: 12px; color: var(--ink-muted); letter-spacing: 0.04em; }
+.lb-stats { margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
+.lb-stat { font-size: 12.5px; color: var(--ink-muted); white-space: nowrap; }
+.lb-stat strong { font-size: 15px; color: var(--ink); }
+.lb-volume strong { color: var(--green-bold); }
+@media (max-width: 640px) {
+  .lb-row { flex-wrap: wrap; }
+  .lb-stats { margin-left: 50px; width: 100%; justify-content: flex-start; }
+}

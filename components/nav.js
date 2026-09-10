@@ -3,6 +3,7 @@ export function renderNav(container, { activePath = "/" } = {}) {
   const isResults = activePath === "/results";
   const isHost = activePath === "/host";
   const isDocs = activePath === "/how-it-works";
+  const isBoard = activePath === "/leaderboard";
 
   container.innerHTML = `
     <header class="nav-wrapper">
@@ -24,6 +25,9 @@ export function renderNav(container, { activePath = "/" } = {}) {
             </li>
             <li>
               <a href="/results" class="nav-link ${isResults ? "active" : ""}">Results</a>
+            </li>
+            <li>
+              <a href="/leaderboard" class="nav-link ${isBoard ? "active" : ""}">Leaderboard</a>
             </li>
             <li>
               <a href="/how-it-works" class="nav-link ${isDocs ? "active" : ""}">How It Works</a>
@@ -59,6 +63,7 @@ export function renderNav(container, { activePath = "/" } = {}) {
         <div class="mobile-menu-drawer" id="mobile-drawer" aria-hidden="true">
           <a href="/lobby" class="mobile-link">Auction Floor</a>
           <a href="/results" class="mobile-link">Past Results</a>
+          <a href="/leaderboard" class="mobile-link">Leaderboard</a>
           <a href="/how-it-works" class="mobile-link">How It Works</a>
           ${isHost ? "" : `<a href="/host" class="mobile-link">Host an Auction</a>`}
         </div>

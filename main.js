@@ -8,6 +8,7 @@ import { renderNotFound } from "./views/not-found.js";
 import { renderHowItWorks } from "./views/how-it-works.js";
 import { renderPrivacy } from "./views/privacy.js";
 import { renderTerms } from "./views/terms.js";
+import { renderLeaderboard } from "./views/leaderboard.js";
 
 let cleanup = null;
 
@@ -59,6 +60,8 @@ function initApp() {
       cleanup = renderHost(mainContent) || null;
     } else if (path === "/results") {
       cleanup = renderResults(mainContent) || null;
+    } else if (path === "/leaderboard") {
+      cleanup = renderLeaderboard(mainContent) || null;
     } else if (path === "/how-it-works") {
       cleanup = renderHowItWorks(mainContent) || null;
     } else if (path === "/privacy") {
