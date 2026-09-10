@@ -27,7 +27,8 @@
   "dependencies": {
     "@nimiq/core": "^2.7.1",
     "@nimiq/mini-app-sdk": "^0.1.0",
-    "@noble/hashes": "^2.0.1"
+    "@noble/hashes": "^2.0.1",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260728.1",

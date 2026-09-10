@@ -31,7 +31,11 @@ export function renderResults(container) {
              String(item.hostAddress || "").toLowerCase().includes(q);
     });
 
-    const totalVolumeLunas = catalog.reduce((sum, item) => sum + (item.winningBidLunas || 0), 0);
+    // Settled means the payment verified on-chain. Rejected attempts stay
+    // on the ledger as audit history, but never count toward settled volume.
+    const verified = catalog.filter((item) => item.settlement?.state === "verified");
+    const rejected = catalog.filter((item) => item.settlement?.state === "rejected");
+    const totalVolumeLunas = verified.reduce((sum, item) => sum + (item.winningBidLunas || 0), 0);
 
     container.innerHTML = `
       <div class="results-view">
@@ -46,17 +50,18 @@ export function renderResults(container) {
               <h1 class="results-page-title">Results Ledger</h1>
               <span class="results-stat-badge">
                 <span class="badge-dot"></span>
-                <span>${catalog.length} Settled Auction${catalog.length === 1 ? "" : "s"}</span>
+                <span>${verified.length} Verified Settlement${verified.length === 1 ? "" : "s"}${rejected.length ? ` · ${rejected.length} Rejected` : ""}</span>
               </span>
             </div>
             <p class="results-page-desc">
-              Immutable public proof of every hammer price, winning paddle, and verified on-chain transfer on Nimiq.
+              Public proof of every hammer price, winning paddle, and on-chain settlement check on Nimiq. Rejected payment attempts stay on the ledger — that is the verification working.
             </p>
           </div>
 
           <div class="results-volume-card">
-            <span class="volume-label">TOTAL SETTLED VOLUME</span>
+            <span class="volume-label">VERIFIED SETTLED VOLUME</span>
             <span class="volume-amount">${formatNim(totalVolumeLunas)} NIM</span>
+            ${rejected.length ? `<span class="volume-fiat">${rejected.length} rejected attempt${rejected.length === 1 ? "" : "s"} not counted</span>` : ""}
           </div>
         </div>
 
@@ -90,6 +95,13 @@ export function renderResults(container) {
           <p class="quiet-desc">The first hammer falls soon. Results land here with their on-chain receipts.</p>
           <div class="quiet-actions">
             <a href="/lobby" class="btn-quiet-results">Back to the Floor</a>
+          </div>
+        </div>` : !filtered.length ? `
+        <div class="quiet-floor-state" data-animate="scale-in">
+          <h2 class="quiet-title">No records match "${escapeHtml(searchQuery)}".</h2>
+          <p class="quiet-desc">Try a different lot title or host address.</p>
+          <div class="quiet-actions">
+            <button class="btn-quiet-results" id="btn-clear-search">Clear Search</button>
           </div>
         </div>` : `
         <!-- Results Grid -->
@@ -176,6 +188,12 @@ export function renderResults(container) {
         }
       });
     }
+
+    const clearSearch = container.querySelector("#btn-clear-search");
+    if (clearSearch) clearSearch.addEventListener("click", () => {
+      searchQuery = "";
+      render();
+    });
   }
 
   async function load() {

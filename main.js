@@ -19,11 +19,23 @@ function initApp() {
     }
 
     const path = window.location.pathname;
+    const isLanding = path === "/" || path === "";
 
     app.innerHTML = `
+      <a class="skip-link" href="#main-content">Skip to content</a>
       <div class="ambient-glow" aria-hidden="true"></div>
       <div id="nav-slot"></div>
       <main class="shell" id="main-content"></main>
+      ${isLanding ? "" : `
+      <footer class="app-trust-footer">
+        <span class="trust-footer-brand">NIMGAVEL</span>
+        <nav class="trust-footer-links" aria-label="Trust links">
+          <a href="/results">Results</a>
+          <a href="https://nimiq.watch" target="_blank" rel="noopener noreferrer">Nimiq Watch ↗</a>
+          <a href="https://github.com/mystiquemide/nimgavel" target="_blank" rel="noopener noreferrer">Source ↗</a>
+          <a href="https://nimiq.com/pay/" target="_blank" rel="noopener noreferrer">Nimiq Pay ↗</a>
+        </nav>
+      </footer>`}
     `;
 
     const navSlot = document.getElementById("nav-slot");

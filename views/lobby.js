@@ -1,6 +1,7 @@
 import { listLots, getRoomState, ApiError } from "../lib/api.js";
 import { formatNim } from "../lib/nimiq.js";
 import { session, bootWallet, isSpectate, walletReady } from "../lib/session.js";
+import { qrToggleMarkup, wireQrToggle } from "../lib/qr.js";
 import { escapeHtml, escapeAttr, shortAddress } from "./room.js";
 
 const LIST_REFRESH_MS = 30_000;
@@ -14,6 +15,7 @@ export function renderLobby(container) {
     rooms: new Map(), // lotId -> room state
     walletBooted: false,
     unreachable: false,
+    loaded: false,
     listTimer: null,
     liveTimer: null
   };
@@ -100,6 +102,30 @@ export function renderLobby(container) {
   }
 
   function quietFloor() {
+    if (state.unreachable) {
+      return `
+        <div class="quiet-floor-state" data-animate="scale-in">
+          <div class="quiet-icon-box">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <h2 class="quiet-title">Can't reach the auction house right now.</h2>
+          <p class="quiet-desc">Your connection or ours. The rooms come back with a retry.</p>
+          <div class="quiet-actions">
+            <button class="btn-quiet-results" id="btn-retry-floor">Retry the Floor</button>
+          </div>
+        </div>
+      `;
+    }
+    const emptyCopy = {
+      all: ["No auctions on the block right now.", "Rooms open when a host lists a lot. Check back soon or host the next one."],
+      live: ["No live bidding right now.", "Rooms open when a host lists a lot. Check back soon."],
+      closing: ["Nothing is closing right now.", "Live rooms enter their final 30 seconds here — with the anti-snipe window in play."],
+      upcoming: ["No upcoming auctions yet.", "Scheduled lots land here before they open. Host the next one and pick your start time."]
+    }[activeFilter] || ["Nothing here yet.", "Check back soon."];
     return `
       <div class="quiet-floor-state" data-animate="scale-in">
         <div class="quiet-icon-box">
@@ -108,12 +134,8 @@ export function renderLobby(container) {
             <line x1="8" y1="12" x2="16" y2="12"></line>
           </svg>
         </div>
-        <h2 class="quiet-title">${state.unreachable ? "Can't reach the auction house right now." : "No auctions in this category right now."}</h2>
-        <p class="quiet-desc">
-          ${state.unreachable
-            ? "Your connection or ours. The rooms come back with a refresh."
-            : "No live auctions currently match this filter. You can browse recent hammer results or host the next community auction."}
-        </p>
+        <h2 class="quiet-title">${emptyCopy[0]}</h2>
+        <p class="quiet-desc">${emptyCopy[1]}</p>
         <div class="quiet-actions">
           <a href="/results" class="btn-quiet-results">View Past Results</a>
           <a href="/host" class="btn-quiet-host">Host the Next Auction</a>
@@ -180,8 +202,12 @@ export function renderLobby(container) {
         ${isSpectate() ? `
         <div class="spectate-note-row">
           <span>Watching from a plain browser. Bidding runs inside Nimiq Pay.</span>
-          <a class="btn-open-pay" href="nimiqpay://miniapp?url=${encodeURIComponent(APP_ORIGIN + "/lobby")}">Open in Nimiq Pay</a>
-        </div>` : ""}
+          <span class="spectate-actions">
+            ${qrToggleMarkup("lobby-qr-toggle")}
+            <a class="btn-open-pay" href="nimiqpay://miniapp?url=${encodeURIComponent(APP_ORIGIN + "/lobby")}">Open in Nimiq Pay</a>
+          </span>
+        </div>
+        <p class="spectate-install-note">No Nimiq Pay yet? Get it free at <a href="https://nimiq.com/pay/" target="_blank" rel="noopener">nimiq.com/pay</a> — then scan the QR to jump straight into the floor.</p>` : ""}
 
         <!-- Filter Pills Bar -->
         <div class="lobby-filters-bar" role="tablist" aria-label="Filter auction lots">
@@ -199,8 +225,21 @@ export function renderLobby(container) {
           </button>
         </div>
 
-        <!-- Auction Floor Grid or Quiet State -->
-        ${filteredLots.length === 0
+        <!-- Auction Floor Grid, Loading Skeleton, or Quiet State -->
+        ${!state.loaded
+          ? `
+        <div class="lobby-lots-grid" aria-label="Loading the auction floor">
+          ${[0, 1, 2].map(() => `
+          <div class="lobby-lot-card lobby-skeleton-card" aria-hidden="true">
+            <div class="lobby-card-media"><div class="skeleton-shimmer"></div></div>
+            <div class="lobby-card-body">
+              <div class="skeleton-line w-70"></div>
+              <div class="skeleton-line w-45"></div>
+              <div class="skeleton-line w-90"></div>
+            </div>
+          </div>`).join("")}
+        </div>`
+          : filteredLots.length === 0
           ? quietFloor()
           : `
         <div class="lobby-lots-grid" data-animate-stagger>
@@ -216,6 +255,21 @@ export function renderLobby(container) {
       });
     });
 
+    const retry = container.querySelector("#btn-retry-floor");
+    if (retry) retry.addEventListener("click", () => {
+      state.loaded = false;
+      render();
+      refreshList();
+    });
+
+    if (isSpectate()) {
+      wireQrToggle({
+        container,
+        toggleId: "lobby-qr-toggle",
+        deeplink: `nimiqpay://miniapp?url=${encodeURIComponent(APP_ORIGIN + "/lobby")}`
+      });
+    }
+
     initAnimations(container);
   }
 
@@ -227,6 +281,10 @@ export function renderLobby(container) {
       if (!(error instanceof ApiError)) throw error;
       state.unreachable = true;
     }
+    // Rooms and lots load together: the floor must never show a start
+    // price as if it were the live bid.
+    await pollLiveRooms();
+    state.loaded = true;
     render();
   }
 
@@ -250,7 +308,9 @@ export function renderLobby(container) {
       const rem = roomRemaining(room);
       if (timer && rem !== null) timer.textContent = formatRemaining(rem);
       const nim = card.querySelector(".lobby-bid-nim");
-      if (nim) nim.textContent = `${formatNim(room.currentBidLunas)} NIM`;
+      if (nim && typeof room.currentBidLunas === "number") {
+        nim.textContent = `${formatNim(room.currentBidLunas)} NIM`;
+      }
       const count = card.querySelector(".lobby-bids-count");
       if (count) {
         const bidCount = Array.isArray(room.bids) ? room.bids.length : 0;

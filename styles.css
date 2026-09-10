@@ -3685,3 +3685,112 @@ body.animate-ready [data-animate-stagger].in-view > [data-animate-child]:nth-chi
 
 /* cache-bust 2026-09-10T13:26Z */
 .cb-v2-2026091013 { --cache-bust: 2; }
+
+/* ===== Audit round: skeleton, QR handoff, sticky bid bar, trust footer ===== */
+
+/* Skip link: keyboard users jump straight to content. */
+.skip-link {
+  position: absolute; left: 8px; top: -52px; z-index: 90;
+  background: var(--green-bold); color: #fff;
+  font-family: var(--font-mono); font-size: 13px;
+  padding: 12px 18px; border-radius: 0 0 10px 10px;
+  text-decoration: none; transition: top 0.15s ease;
+}
+.skip-link:focus { top: 0; }
+
+/* Lobby loading skeleton: honest "loading", never looks empty. */
+.lobby-skeleton-card { opacity: 0.85; }
+.skeleton-shimmer {
+  width: 100%; height: 100%; min-height: 180px;
+  background: linear-gradient(100deg, var(--canvas-warm) 40%, #FBF7EC 50%, var(--canvas-warm) 60%);
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-sweep { to { background-position: -200% 0; } }
+.skeleton-line {
+  height: 14px; margin: 10px 0; border-radius: 7px;
+  background: var(--canvas-warm); animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+.skeleton-line.w-70 { width: 70%; }
+.skeleton-line.w-45 { width: 45%; }
+.skeleton-line.w-90 { width: 90%; }
+
+/* QR handoff rows. */
+.spectate-actions { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn-qr-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px; padding: 8px 16px;
+  background: var(--canvas-card); color: var(--ink);
+  font-family: var(--font-mono); font-size: 13px; font-weight: 600;
+  border: 1.5px dashed var(--ink); border-radius: 999px; cursor: pointer;
+}
+.btn-qr-toggle:hover { background: var(--gold-wheat); }
+.qr-slot {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  margin: 14px 0; padding: 14px; width: max-content;
+  background: #fff; border: var(--border-dashed-ink); border-radius: 16px;
+}
+.spectate-note-row .qr-slot { margin: 12px auto 0; }
+.qr-hint {
+  margin: 0; font-family: var(--font-body); font-size: 12px; color: var(--ink-muted);
+  max-width: 26ch; text-align: center;
+}
+.spectate-install-note {
+  margin: 8px 0 14px; font-size: 13px; color: var(--ink-muted);
+}
+.spectate-install-note a { color: var(--green-bold); font-weight: 600; }
+.spectate-deck-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* Sticky mobile bid bar: the action never leaves the viewport. */
+.room-sticky-bid-bar {
+  display: none;
+}
+@media (max-width: 767px) {
+  .room-sticky-bid-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    background: var(--ink); border-top: 2px dashed var(--gold-wheat);
+  }
+  .sticky-bid-info { display: flex; flex-direction: column; min-width: 0; }
+  .sticky-bid-label {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+    color: var(--gold-wheat);
+  }
+  .sticky-bid-amount {
+    font-family: var(--font-display); font-weight: 800; font-size: 20px;
+    color: var(--canvas); line-height: 1.1;
+  }
+  .sticky-bid-timer {
+    margin-left: auto;
+    font-family: var(--font-mono); font-size: 14px; color: var(--canvas);
+  }
+  .sticky-bid-cta {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 44px; padding: 10px 16px;
+    background: var(--gold-primary); color: var(--ink-dark);
+    font-family: var(--font-display); font-weight: 700; font-size: 14px;
+    border: 1.5px solid var(--ink); border-radius: 999px;
+    text-decoration: none; cursor: pointer; white-space: nowrap;
+  }
+  body { padding-bottom: 74px; }
+}
+
+/* Shared trust footer on app routes (landing keeps its full footer). */
+.app-trust-footer {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px 18px; margin-top: 40px; padding: 18px 20px;
+  border-top: 1.5px dashed var(--ink);
+  color: var(--ink-muted); font-size: 13px;
+}
+.trust-footer-brand {
+  font-family: var(--font-display); font-weight: 800; font-size: 15px;
+  letter-spacing: 0.04em; color: var(--ink);
+}
+.trust-footer-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.trust-footer-links a {
+  font-family: var(--font-mono); font-size: 12px; color: var(--ink-muted);
+  padding: 6px 0; min-height: 32px; display: inline-flex; align-items: center;
+  text-decoration: none;
+}
+.trust-footer-links a:hover { color: var(--ink); text-decoration: underline; }

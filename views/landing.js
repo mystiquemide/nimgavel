@@ -88,7 +88,7 @@ export function renderLanding(container) {
           <span class="rules-kicker">SETTLED AUCTIONS</span>
           <h2 id="results-preview-heading" class="results-preview-title">Recent hammer results</h2>
           <p class="results-preview-subhead">
-            Real lots, real winning paddles, and verified on-chain transfers on Nimiq.
+            Real lots, real winning paddles, and on-chain settlement records on Nimiq.
           </p>
         </div>
         <a href="/results" class="view-all-results-link">

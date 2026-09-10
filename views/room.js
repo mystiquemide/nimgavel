@@ -6,6 +6,7 @@ import {
 } from "../lib/nimiq.js";
 import { session, bootWallet, isSpectate, walletReady } from "../lib/session.js";
 import { createRoomSocket } from "../lib/ws.js";
+import { qrToggleMarkup, wireQrToggle, PAY_INSTALL_URL } from "../lib/qr.js";
 
 const APP_ORIGIN = "https://nimgavel.artistic-chip.workers.dev";
 
@@ -183,6 +184,17 @@ export function renderRoom(container, lotId) {
             </div>
           </div>
         </div>
+        ${!["sold", "settled", "passed"].includes(state.phase) ? `
+        <div class="room-sticky-bid-bar" aria-label="Current bid summary">
+          <div class="sticky-bid-info">
+            <span class="sticky-bid-label">${state.currentBid ? "CURRENT HIGH BID" : "OPENING BID"}</span>
+            <span class="sticky-bid-amount">${formatNim(state.currentBid || state.minNext || state.startPrice)} NIM</span>
+          </div>
+          ${state.endsAt !== null ? `<span class="sticky-bid-timer" id="sticky-timer">${formatRemaining(remaining() ?? 0)}</span>` : ""}
+          ${canBid()
+            ? `<button class="sticky-bid-cta" id="sticky-bid-btn">Bid ${formatNim(state.minNext)} NIM</button>`
+            : `<a class="sticky-bid-cta" href="nimiqpay://miniapp?url=${encodeURIComponent(`${APP_ORIGIN}/room/${lotId}`)}">Bid in Nimiq Pay</a>`}
+        </div>` : ""}
       </div>
       <div class="toast" role="status" aria-live="polite" style="display:none"></div>
     `;
@@ -286,13 +298,18 @@ export function renderRoom(container, lotId) {
 
     // Spectators (plain browser or wallet not booted) get the Pay handoff.
     if (!walletReady() || session.paddle === null) {
+      const deeplink = `nimiqpay://miniapp?url=${encodeURIComponent(`${APP_ORIGIN}/room/${lotId}`)}`;
       return `
         <div class="spectate-deck-note">
           <p class="spectate-deck-text">Spectator mode. Bidding runs inside Nimiq Pay.</p>
-          <a class="btn-raise-paddle" href="nimiqpay://miniapp?url=${encodeURIComponent(`${APP_ORIGIN}/room/${lotId}`)}">
-            <span>Open in Nimiq Pay to bid</span>
-            <span aria-hidden="true">→</span>
-          </a>
+          <div class="spectate-deck-actions">
+            ${qrToggleMarkup("room-qr-toggle")}
+            <a class="btn-raise-paddle" href="${deeplink}">
+              <span>Open in Nimiq Pay to bid</span>
+              <span aria-hidden="true">→</span>
+            </a>
+          </div>
+          <p class="spectate-install-note">No Nimiq Pay yet? Get it free at <a href="${PAY_INSTALL_URL}" target="_blank" rel="noopener">nimiq.com/pay</a>.</p>
         </div>
       `;
     }
@@ -466,6 +483,17 @@ export function renderRoom(container, lotId) {
 
     const payBtn = container.querySelector("#btn-winner-pay");
     if (payBtn) payBtn.addEventListener("click", payWinner);
+
+    const stickyBtn = container.querySelector("#sticky-bid-btn");
+    if (stickyBtn) stickyBtn.addEventListener("click", () => placeBid(state.minNext));
+
+    if (!walletReady() || session.paddle === null) {
+      wireQrToggle({
+        container,
+        toggleId: "room-qr-toggle",
+        deeplink: `nimiqpay://miniapp?url=${encodeURIComponent(`${APP_ORIGIN}/room/${lotId}`)}`
+      });
+    }
   }
 
   function placeBid(amountLunas) {
@@ -545,8 +573,10 @@ export function renderRoom(container, lotId) {
   function tick() {
     if (typeof state.endsAt !== "number") return;
     const digits = container.querySelector("#deck-timer-digits");
+    const stickyTimer = container.querySelector("#sticky-timer");
     const ms = remaining();
     if (digits && ms !== null) digits.textContent = formatRemaining(ms);
+    if (stickyTimer && ms !== null) stickyTimer.textContent = formatRemaining(ms);
 
     // Smooth client-side phase shifts between server phase messages.
     const next = ms > 30_000 ? "live" : ms > 15_000 ? "going_once" : ms > 0 ? "going_twice" : "sold";
