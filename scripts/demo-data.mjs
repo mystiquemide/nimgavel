@@ -13,6 +13,7 @@ import { KeyPair } from "@nimiq/core";
 import { encodeNimiqSignedMessage } from "../worker/auth.js";
 
 const BASE = process.env.WRANGLER_URL || "http://127.0.0.1:8799";
+if (!["127.0.0.1", "localhost", "[::1]"].includes(new URL(BASE).hostname)) throw new Error("Demo data is local-only and must never be seeded into production.");
 const WS_BASE = BASE.replace(/^http/, "ws");
 const MOCK_RPC_PORT = 8899;
 const RUN = String(Date.now()).slice(-6);
@@ -107,9 +108,10 @@ function startMockRpc() {
   });
 }
 
-function mockTx({ recipient, value }) {
+function mockTx({ recipient, value, hash, lotId }) {
   return {
-    hash: "ab".repeat(32), blockNumber: 1234, timestamp: Date.now(), confirmations: 12,
+    hash, blockNumber: 1234, timestamp: Date.now(), confirmations: 120, networkId: 5,
+    recipientData: Buffer.from(`Nimgavel:${lotId}`).toString("hex"),
     from: "NQ02 31N6 3KM5 T6G5 22TN EPF5 5XPY RLHK RMB3", fromType: 0,
     to: recipient, toType: 0, value, fee: 138, executionResult: true
   };
@@ -156,10 +158,11 @@ async function createSignedLot(spec) {
       hostAddress,
       publicKey: keyPair.publicKey.toHex(),
       signature: signMessage(keyPair, challenge.challenge.message),
-      title: spec.title,
-      description: spec.description,
+      title: `Demo: ${spec.title}`,
+      description: `Synthetic local fixture, not an item for sale. ${spec.description}`,
       imageUrl: spec.image,
       hostPaddle: hostPaddle.paddle,
+      paddleToken: hostPaddle.paddleToken,
       startPriceLunas: spec.startPriceLunas,
       minIncrementLunas: spec.minIncrementLunas,
       durationSec: spec.durationSec || 180,
@@ -212,6 +215,8 @@ async function runWar(spec, { holdOpen = false } = {}) {
     const bidder = new Bidder(lot.id, await getPaddle("bidder"));
     await bidder.open;
     await bidder.waitFor((m) => m.type === "state");
+    bidder.send({ type: "join", paddleToken: bidder.paddleToken });
+    await bidder.waitFor((m) => m.type === "joined");
     bidders.push(bidder);
   }
   const watcher = bidders[0];
@@ -258,7 +263,7 @@ const mock = await startMockRpc();
 // Settled history: 4 parallel wars, each ends sold -> settled -> verified.
 const settled = await Promise.all(SOLD_LOTS.map(async (spec) => {
   const result = await runWar(spec);
-  mock.chain.set(result.txHash, mockTx({ recipient: result.hostAddress, value: result.amountLunas }));
+  mock.chain.set(result.txHash, mockTx({ recipient: result.hostAddress, value: result.amountLunas, hash: result.txHash, lotId: result.lot.id }));
 
   const settledRes = await api(`/api/lots/${encodeURIComponent(result.lot.id)}/settle`, {
     method: "POST",

@@ -9,6 +9,7 @@
 // Run with wrangler dev on 8799 (see README dev commands):
 //   node --test test/settle-verify.test.js
 import { test } from "node:test";
+import "./fixtures.js";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { KeyPair } from "@nimiq/core";
@@ -66,12 +67,14 @@ function startMockRpc() {
   });
 }
 
-function mockTx({ recipient, value, executionResult = true, hash = "ab".repeat(32) }) {
+function mockTx({ recipient, value, executionResult = true, hash = "ab".repeat(32), lotId = "unit-lot" }) {
   return {
     hash,
     blockNumber: 1234,
     timestamp: Date.now(),
-    confirmations: 12,
+    confirmations: 120,
+    networkId: 5,
+    recipientData: Buffer.from(`Nimgavel:${lotId}`).toString("hex"),
     from: "NQ02 31N6 3KM5 T6G5 22TN EPF5 5XPY RLHK RMB3",
     fromType: 0,
     to: recipient,
@@ -121,6 +124,7 @@ async function createAndStartLot() {
       title: "Settlement verification lot",
       description: "matrix",
       hostPaddle: paddle.body.paddle,
+      paddleToken: paddle.body.paddleToken,
       startPriceLunas: 100000,
       minIncrementLunas: 100000,
       durationSec: 5
@@ -152,6 +156,8 @@ async function auctionToSold(hostAddress) {
     ws.addEventListener("error", reject, { once: true });
   });
   await waitFor(messages, (m) => m.type === "state");
+  ws.send(JSON.stringify({ type: "join", paddleToken: bidder.body.paddleToken }));
+  await waitFor(messages, (m) => m.type === "joined");
   ws.send(JSON.stringify({ type: "bid", amountLunas: 100000 }));
   await waitFor(messages, (m) => m.type === "sold", 40_000);
   ws.close();
@@ -183,33 +189,33 @@ test("settlement verification matrix against mock Nimiq RPC", async () => {
   const goodHash = "11".repeat(32);
 
   // not found -> pending
-  const unknown = await verifySettlement({ txHash: "ff".repeat(32), hostAddress: host, amountLunas: 100000, rpcUrl: mock.url });
+  const unknown = await verifySettlement({ txHash: "ff".repeat(32), hostAddress: host, lotId: "unit-lot", network: "testnet", amountLunas: 100000, rpcUrl: mock.url });
   assert.equal(unknown.status, SETTLE_STATE.PENDING);
 
   // exact match -> verified
-  mock.chain.set(goodHash, mockTx({ recipient: host, value: 100000 }));
-  const good = await verifySettlement({ txHash: goodHash, hostAddress: host, amountLunas: 100000, rpcUrl: mock.url });
+  mock.chain.set(goodHash, mockTx({ recipient: host, value: 100000, hash: goodHash }));
+  const good = await verifySettlement({ txHash: goodHash, hostAddress: host, lotId: "unit-lot", network: "testnet", amountLunas: 100000, rpcUrl: mock.url });
   assert.equal(good.status, SETTLE_STATE.VERIFIED);
-  assert.equal(good.confirmations, 12);
+  assert.equal(good.confirmations, 120);
 
   // wrong recipient -> rejected
-  mock.chain.set("22".repeat(32), mockTx({ recipient: "NQ07 0000 0000 0000 0000 0000 0000 0000 0000", value: 100000 }));
-  const wrongHost = await verifySettlement({ txHash: "22".repeat(32), hostAddress: host, amountLunas: 100000, rpcUrl: mock.url });
+  mock.chain.set("22".repeat(32), mockTx({ recipient: "NQ07 0000 0000 0000 0000 0000 0000 0000 0000", value: 100000, hash: "22".repeat(32) }));
+  const wrongHost = await verifySettlement({ txHash: "22".repeat(32), hostAddress: host, lotId: "unit-lot", network: "testnet", amountLunas: 100000, rpcUrl: mock.url });
   assert.equal(wrongHost.status, SETTLE_STATE.REJECTED);
 
   // wrong amount -> rejected
-  mock.chain.set("33".repeat(32), mockTx({ recipient: host, value: 200000 }));
-  const wrongAmount = await verifySettlement({ txHash: "33".repeat(32), hostAddress: host, amountLunas: 100000, rpcUrl: mock.url });
+  mock.chain.set("33".repeat(32), mockTx({ recipient: host, value: 200000, hash: "33".repeat(32) }));
+  const wrongAmount = await verifySettlement({ txHash: "33".repeat(32), hostAddress: host, lotId: "unit-lot", network: "testnet", amountLunas: 100000, rpcUrl: mock.url });
   assert.equal(wrongAmount.status, SETTLE_STATE.REJECTED);
 
   // failed execution -> rejected
-  mock.chain.set("44".repeat(32), mockTx({ recipient: host, value: 100000, executionResult: false }));
-  const failed = await verifySettlement({ txHash: "44".repeat(32), hostAddress: host, amountLunas: 100000, rpcUrl: mock.url });
+  mock.chain.set("44".repeat(32), mockTx({ recipient: host, value: 100000, executionResult: false, hash: "44".repeat(32) }));
+  const failed = await verifySettlement({ txHash: "44".repeat(32), hostAddress: host, lotId: "unit-lot", network: "testnet", amountLunas: 100000, rpcUrl: mock.url });
   assert.equal(failed.status, SETTLE_STATE.REJECTED);
 
   // compact address format matches spaced host format
-  mock.chain.set("55".repeat(32), mockTx({ recipient: host.replace(/ /g, ""), value: 100000 }));
-  const compact = await verifySettlement({ txHash: "55".repeat(32), hostAddress: host, amountLunas: 100000, rpcUrl: mock.url });
+  mock.chain.set("55".repeat(32), mockTx({ recipient: host.replace(/ /g, ""), value: 100000, hash: "55".repeat(32) }));
+  const compact = await verifySettlement({ txHash: "55".repeat(32), hostAddress: host, lotId: "unit-lot", network: "testnet", amountLunas: 100000, rpcUrl: mock.url });
   assert.equal(compact.status, SETTLE_STATE.VERIFIED);
 
   // -- integration: settle records pending; verify flips to verified --
@@ -240,7 +246,7 @@ test("settlement verification matrix against mock Nimiq RPC", async () => {
   // chain sees the payment: verify flips to verified and persists
   const detailForHost = await requestJson(`/api/lots/${encodeURIComponent(lotId)}`);
   const hostAddress = detailForHost.body.lot.hostAddress;
-  mock.chain.set(txHash, mockTx({ recipient: hostAddress, value: 100000 }));
+  mock.chain.set(txHash, mockTx({ recipient: hostAddress, value: 100000, hash: txHash, lotId }));
 
   const verified = await requestJson(`/api/lots/${encodeURIComponent(lotId)}/verify`, {
     method: "POST",
@@ -284,7 +290,7 @@ test("settlement verification matrix against mock Nimiq RPC", async () => {
   assert.equal(secondSettled.body.receipt.settlement.state, SETTLE_STATE.PENDING);
 
   const secondDetail = await requestJson(`/api/lots/${encodeURIComponent(second.lotId)}`);
-  mock.chain.set(secondHash, mockTx({ recipient: secondDetail.body.lot.hostAddress, value: 100000 }));
+  mock.chain.set(secondHash, mockTx({ recipient: secondDetail.body.lot.hostAddress, value: 100000, hash: secondHash, lotId: second.lotId }));
 
   // Trigger the worker's scheduled handler: wrangler exposes it at
   // /cdn-cgi/local/scheduled when --test-scheduled is enabled.
@@ -303,7 +309,7 @@ test("settlement verification matrix against mock Nimiq RPC", async () => {
     body: JSON.stringify({ txHash: thirdHash })
   });
   // payment went to a different address than the host
-  mock.chain.set(thirdHash, mockTx({ recipient: "NQ07 0000 0000 0000 0000 0000 0000 0000 0000", value: 100000 }));
+  mock.chain.set(thirdHash, mockTx({ recipient: "NQ07 0000 0000 0000 0000 0000 0000 0000 0000", value: 100000, hash: thirdHash, lotId: third.lotId }));
   const rejected = await requestJson(`/api/lots/${encodeURIComponent(third.lotId)}/verify`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${third.bidder.body.paddleToken}` },

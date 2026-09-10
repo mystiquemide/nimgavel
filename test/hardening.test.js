@@ -4,6 +4,7 @@
 //   node --test test/hardening.test.js
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { makeLot, startAuction } from "./fixtures.js";
 
 const BASE = process.env.WRANGLER_URL || "http://127.0.0.1:8799";
 const WS_BASE = BASE.replace(/^http/, "ws");
@@ -61,22 +62,9 @@ test("paddle requests without a client IP skip the throttle", async () => {
 });
 
 test("a flooding WebSocket connection is closed after the message cap", async () => {
-  const lotId = `t14-flood-${RUN}`;
-  await fetch(`${BASE}/ws/${lotId}/seed`, {
-    method: "POST",
-    body: JSON.stringify({
-      id: lotId,
-      title: "Flood guard lot",
-      description: "t14",
-      imageUrl: null,
-      hostPaddle: 999,
-      hostAddress: "NQ07TESTTESTTESTTESTTESTTESTTESTTESTTESTTESTTEST0P",
-      startPriceLunas: 500000,
-      minIncrementLunas: 100000,
-      durationSec: 300
-    })
-  });
-  await fetch(`${BASE}/ws/${lotId}/start`, { method: "POST" });
+  const created = await makeLot({ title: "Flood guard lot", durationSec: 300 });
+  const lotId = created.lot.id;
+  await startAuction(created);
 
   const ws = new WebSocket(`${WS_BASE}/ws/${lotId}?paddle=501&alias=FloodTest`);
   await new Promise((resolve, reject) => {

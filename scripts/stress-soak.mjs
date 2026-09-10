@@ -9,13 +9,17 @@
 // never touches the shared dev server on 8799.
 //   npm run soak
 import { spawn, execSync } from "node:child_process";
-import { rmSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const PORT = 8811;
 const BASE = `http://127.0.0.1:${PORT}`;
 const WS_BASE = `ws://127.0.0.1:${PORT}`;
-const PERSIST = ".wrangler/soak-state";
+const PERSIST = `.wrangler/soak-state-${Date.now()}-${process.pid}`;
+process.env.WRANGLER_URL = BASE;
+const { makeLot, makePaddle, startAuction } = await import("../test/fixtures.js");
+const paddles = new Map();
+let alpha;
+let bravo;
 const RUN = String(Date.now());
 const LOT = {
   id: `soak-${RUN}`,
@@ -43,16 +47,18 @@ async function jf(path, options) {
 class Conn {
   constructor(paddle, alias, lotId = LOT.id) {
     this.paddle = paddle;
-    this.ws = new WebSocket(`${WS_BASE}/ws/${lotId}?paddle=${paddle}&alias=${encodeURIComponent(alias)}`);
+    this.ws = new WebSocket(`${WS_BASE}/ws/${lotId}`);
     this.queue = [];
     this.waiters = [];
     this.ws.addEventListener("message", (event) => {
       const msg = JSON.parse(event.data);
+      if (msg.type === "joined") { this.joinedResolve(); return; }
       if (this.waiters.length) this.waiters.shift()(msg);
       else this.queue.push(msg);
     });
     this.open = new Promise((resolve, reject) => {
-      this.ws.addEventListener("open", resolve, { once: true });
+      this.joinedResolve = resolve;
+      this.ws.addEventListener("open", () => this.send({ type: "join", paddleToken: paddles.get(paddle).paddleToken }), { once: true });
       this.ws.addEventListener("error", reject, { once: true });
     });
   }
@@ -78,7 +84,7 @@ let server = null;
 let serverLogs = "";
 
 function startServer() {
-  server = spawn("npx", ["wrangler", "dev", "--port", String(PORT), "--persist-to", PERSIST], {
+  server = spawn("npx", ["wrangler", "dev", "--local", "--ip", "127.0.0.1", "--port", String(PORT), "--inspector-port", "9245", "--persist-to", PERSIST, "--var", "NIMGAVEL_SECRET:soak-local-only-not-production-secret"], {
     cwd: process.cwd(),
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
@@ -122,23 +128,21 @@ async function waitPortFree(timeoutMs = 20000) {
 
 async function main() {
   log("fresh state dir + migrations");
-  rmSync(PERSIST, { recursive: true, force: true });
   execSync(`npx wrangler d1 migrations apply nimgavel --local --persist-to ${PERSIST}`, { stdio: "pipe" });
 
-  // The soak drives the full D1 path too: seed the lots row the DO will update.
-  execSync(
-    `npx wrangler d1 execute nimgavel --local --persist-to ${PERSIST} --command ` +
-    `"INSERT INTO lots (id, title, description, image_url, host_paddle, host_address, start_price_lunas, min_increment_lunas, duration_sec, status, created_at) VALUES ('${LOT.id}', 'Soak lot', 'T17', NULL, 7, '${LOT.hostAddress}', ${LOT.startPriceLunas}, ${LOT.minIncrementLunas}, ${LOT.durationSec}, 'created', ${Date.now()})"`,
-    { stdio: "pipe" }
-  );
+  // The soak drives the full D1 path through signed public lot creation.
 
   log("starting wrangler dev on :8811");
   startServer();
   await waitForHealth();
 
-  await jf(`/ws/${LOT.id}/seed`, { method: "POST", body: JSON.stringify(LOT) });
-  const started = await jf(`/ws/${LOT.id}/start`, { method: "POST" });
-  if (started.phase !== "live") throw new Error(`expected live, got ${started.phase}`);
+  const created = await makeLot(LOT);
+  Object.assign(LOT, created.lot);
+  alpha = await makePaddle();
+  bravo = await makePaddle();
+  for (const paddle of [alpha, bravo]) paddles.set(paddle.paddle, paddle);
+  const started = await startAuction(created);
+  if (started.state.phase !== "live") throw new Error(`expected live, got ${started.state.phase}`);
   log("auction live (90s duration)");
 
   let amount = LOT.startPriceLunas;
@@ -153,24 +157,24 @@ async function main() {
       if (confirmed < target) {
         amount += LOT.minIncrementLunas;
         connA.send({ type: "bid", amountLunas: amount });
-        await connA.confirmBid(81, amount);
+        await connA.confirmBid(alpha.paddle, amount);
         confirmed += 1;
-        lastPaddle = 81;
+        lastPaddle = alpha.paddle;
       }
       if (confirmed < target) {
         amount += LOT.minIncrementLunas;
         connB.send({ type: "bid", amountLunas: amount });
-        await connB.confirmBid(82, amount);
+        await connB.confirmBid(bravo.paddle, amount);
         confirmed += 1;
-        lastPaddle = 82;
+        lastPaddle = bravo.paddle;
       }
       await sleep(620);
     }
   }
 
   // Phase 1: two clients bid up to the kill threshold.
-  const a = new Conn(81, "SoakAlpha");
-  const b = new Conn(82, "SoakBravo");
+  const a = new Conn(alpha.paddle, "SoakAlpha");
+  const b = new Conn(bravo.paddle, "SoakBravo");
   await a.open; await b.open;
   await a.recv(); await b.recv(); // drain initial state
   await bidRounds(a, b, BIDS_BEFORE_KILL);
@@ -204,8 +208,8 @@ async function main() {
   // gavel already fell during downtime (slow restart), that is a valid
   // recovery outcome: fall through to the sold checks.
   a.close(); b.close();
-  const c = new Conn(81, "SoakAlpha");
-  const d = new Conn(82, "SoakBravo");
+  const c = new Conn(alpha.paddle, "SoakAlpha");
+  const d = new Conn(bravo.paddle, "SoakBravo");
   await c.open; await d.open;
   await c.recv(); await d.recv();
 

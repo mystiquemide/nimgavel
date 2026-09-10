@@ -4,4 +4,4 @@
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self' https://rpc.nimiqwatch.com https://rpc.testnet.nimiqwatch.com wss: ws:; frame-ancestors 'none'; base-uri 'self'
+  Content-Security-Policy: default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://rpc.nimiqwatch.com https://rpc.testnet.nimiqwatch.com wss://nimgavel.artistic-chip.workers.dev ws://localhost:* ws://127.0.0.1:*; frame-ancestors 'none'; base-uri 'self'

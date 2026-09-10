@@ -3601,7 +3601,7 @@ body.animate-ready [data-animate-stagger].in-view > [data-animate-child]:nth-chi
 
 /* Rejected / pending settlement chips + reason line. */
 .settle-rejected-box { padding: 14px 0 4px; }
-.verified-check-badge.rejected { background: var(--coral-accent); color: #fff; }
+.verified-check-badge.rejected { background: var(--tint-coral); color: var(--ink); }
 .archive-chip-rejected {
   position: absolute;
   top: 12px;
@@ -3610,8 +3610,8 @@ body.animate-ready [data-animate-stagger].in-view > [data-animate-child]:nth-chi
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  background: var(--coral-accent);
-  color: #fff;
+  background: var(--tint-coral);
+  color: var(--ink);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 600;

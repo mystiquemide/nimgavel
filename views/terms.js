@@ -15,7 +15,7 @@ export function renderTerms(container) {
         <ul class="doc-list">
           <li>Nimgavel runs live auctions and records their outcome, including on-chain settlement receipts.</li>
           <li>Payments are direct, wallet to wallet, between the winning bidder and the host. Nimgavel never holds, routes, or refunds funds.</li>
-          <li>Bids are free. Listings are free. There are no fees.</li>
+          <li>Bids and listings are free. Nimgavel charges no platform fee. Network transaction fees may apply.</li>
         </ul>
       </section>
 
@@ -25,7 +25,7 @@ export function renderTerms(container) {
           <li>Not an escrow service. Once the gavel falls, the payment is entirely between winner and host.</li>
           <li>Not a dispute resolution body. If a lot is not as described, that is between the bidders and the host.</li>
           <li>Not a guarantor. A verified receipt proves an on-chain payment matched the auction. It does not certify the item itself.</li>
-          <li>Not a background checker. Hosts are anonymous paddles, exactly like bidders.</li>
+          <li>Not a background checker. Host payout addresses and their associated paddles are public.</li>
         </ul>
       </section>
 
@@ -36,14 +36,14 @@ export function renderTerms(container) {
           <li>Bids in the final 30 seconds extend the auction by 30 seconds.</li>
           <li>The highest qualifying bid at close wins. If no bid meets the reserve, the lot passes.</li>
           <li>The host cannot bid in their own room.</li>
-          <li>Abuse (rate-limit evasion, spam paddles, manipulation) gets paddles removed.</li>
+          <li>Rate-limit evasion, spam paddles and bid manipulation are prohibited. A device paddle does not prove a unique person, and the app cannot prevent a host using a different device.</li>
         </ul>
       </section>
 
       <section class="doc-section">
         <h2>Settlement verification</h2>
         <p>
-          Receipts are marked verified only when the recorded transaction pays the exact host address and amount on the Nimiq blockchain. A rejected receipt means the check failed; it stays on the public ledger as an audit record. Verification is a payment check, not an endorsement of the lot.
+          Receipts are marked verified only when the recorded transaction pays the exact host address and amount on the Nimiq blockchain. A rejected receipt means the check failed; the winner can correct its transaction reference after checking their wallet. Verification is a payment check, not an endorsement of the lot.
         </p>
       </section>
 

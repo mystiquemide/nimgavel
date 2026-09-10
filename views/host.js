@@ -16,6 +16,8 @@ const defaultPhoto = "https://images.unsplash.com/photo-1526170375885-4d8ecf77b9
 const APP_ORIGIN = "https://nimgavel.artistic-chip.workers.dev";
 
 export function renderHost(container) {
+  let disposed = false;
+  const controls = new Map();
   const state = {
     creating: false,
     justCreated: null,
@@ -34,6 +36,7 @@ export function renderHost(container) {
   }
 
   function render() {
+    if (disposed) return;
     if (state.shareLot) {
       renderShareView();
       return;
@@ -47,7 +50,7 @@ export function renderHost(container) {
       renderBootGate();
       return;
     }
-    if (!walletReady() || !getAccount()) {
+    if (!walletReady() || !getAccount() || !session.paddleToken) {
       renderWalletTroubleGate();
       return;
     }
@@ -609,6 +612,7 @@ export function renderHost(container) {
     state.creating = true;
     state.formError = null;
 
+    if (!session.paddleToken) { state.creating = false; state.formError = "Reconnect your paddle before hosting."; render(); return; }
     const form = new FormData(event.target);
     const startPriceLunas = Math.round(Number(form.get("price")) * 100000);
     const minIncrementLunas = Math.round(Number(form.get("inc")) * 100000);
@@ -636,11 +640,13 @@ export function renderHost(container) {
         description,
         imageUrl,
         hostPaddle: session.paddle,
+        paddleToken: session.paddleToken,
         startPriceLunas,
         minIncrementLunas,
         durationSec
       });
 
+      controls.set(created.lot.id, created.hostToken);
       try {
         const store = JSON.parse(localStorage.getItem(myLotsKey) || "{}");
         store[created.lot.id] = { hostToken: created.hostToken, savedAt: Date.now() };
@@ -649,6 +655,7 @@ export function renderHost(container) {
 
       state.justCreated = created.lot.id;
       state.shareLot = created.lot;
+      if (created.roomReady === false) state.formError = "Your lot is saved. The room is temporarily unavailable; Start will retry initialization.";
       state.imageUrl = "";
       await refreshMyLots();
     } catch (error) {
@@ -668,8 +675,11 @@ export function renderHost(container) {
   async function onStart(lotId) {
     state.formError = null;
     try {
-      const store = JSON.parse(localStorage.getItem(myLotsKey) || "{}");
-      const hostToken = store[lotId]?.hostToken;
+      let hostToken = controls.get(lotId);
+      if (!hostToken) {
+        const store = JSON.parse(localStorage.getItem(myLotsKey) || "{}");
+        hostToken = store[lotId]?.hostToken;
+      }
       if (!hostToken) throw new Error("Start permission is tied to this device's wallet. Recreate the lot here to start it.");
       try {
         await startLot(lotId, hostToken);
@@ -720,5 +730,5 @@ export function renderHost(container) {
 
   render();
 
-  return function cleanup() { /* listeners die with the DOM */ };
+  return function cleanup() { disposed = true; /* listeners die with the DOM */ };
 }

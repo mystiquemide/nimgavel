@@ -6,9 +6,11 @@ import { formatNim } from "../lib/nimiq.js";
 import { escapeHtml } from "./room.js";
 
 export function renderLeaderboard(container) {
+  let disposed = false;
   const state = { rows: null, unreachable: false };
 
   function render() {
+    if (disposed) return;
     if (state.unreachable) {
       container.innerHTML = `
         <div class="doc-view">
@@ -65,7 +67,7 @@ export function renderLeaderboard(container) {
           <span class="lb-stat"><strong class="num">${row.wins}</strong> won</span>
           <span class="lb-stat"><strong class="num">${row.bids}</strong> bids</span>
           <span class="lb-stat"><strong class="num">${row.rooms}</strong> rooms</span>
-          <span class="lb-stat lb-volume"><strong class="num">${formatNim(row.wonLunas)}</strong> NIM taken</span>
+          <span class="lb-stat lb-volume"><strong class="num">${formatNim(row.wonLunas)}</strong> NIM in winning bids</span>
         </div>
       </div>
     `).join("");
@@ -129,5 +131,5 @@ export function renderLeaderboard(container) {
 
   load();
 
-  return function cleanup() { /* listeners die with the DOM */ };
+  return function cleanup() { disposed = true; /* listeners die with the DOM */ };
 }

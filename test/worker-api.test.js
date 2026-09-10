@@ -1,10 +1,11 @@
 // T4 API smoke test. Run with wrangler dev and a configured auth secret:
 //   npx wrangler dev --port 8799 & then:
 //   node --test test/worker-api.test.js
-// Requires .dev.vars with NIMGAVEL_SECRET (>= 16 chars).
+// Requires .dev.vars with NIMGAVEL_SECRET (>= 32 chars).
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import "./fixtures.js";
 import { Hash, KeyPair } from "@nimiq/core";
 import {
   encodeNimiqSignedMessage,
@@ -66,6 +67,7 @@ test("T4 REST API completes the host, room, and settlement path", async () => {
       title: "T4 verification lot",
       description: "REST API verification",
       hostPaddle: paddle.body.paddle,
+      paddleToken: paddle.body.paddleToken,
       startPriceLunas: 100000,
       minIncrementLunas: 100000,
       durationSec: 5
@@ -112,6 +114,8 @@ test("T4 REST API completes the host, room, and settlement path", async () => {
     ws.addEventListener("error", reject, { once: true });
   });
   await waitForMessage(messages, (message) => message.type === "state");
+  ws.send(JSON.stringify({ type: "join", paddleToken: bidder.body.paddleToken }));
+  await waitForMessage(messages, (message) => message.type === "joined");
   ws.send(JSON.stringify({ type: "bid", amountLunas: 100000 }));
   await waitForMessage(messages, (message) => message.type === "bid" && message.amountLunas === 100000);
   await waitForMessage(messages, (message) => message.type === "sold", 40_000);

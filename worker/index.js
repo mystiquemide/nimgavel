@@ -21,9 +21,10 @@ export { AuctionRoom };
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "x-content-type-options": "nosniff",
-  "referrer-policy": "no-referrer"
+  "referrer-policy": "no-referrer",
+  "cache-control": "no-store"
 };
-const MAX_BODY_BYTES = 64 * 1024;
+const MAX_BODY_BYTES = 320 * 1024;
 const MAX_BID_LUNAS = 1e12;
 const MAX_PADDLE = 2_000_000_000;
 const MAX_LOT_LIMIT = 100;
@@ -173,13 +174,15 @@ async function forwardWebSocket(request, env, url) {
   const lotId = pieces[2] ? decodeLotId(pieces[2]) : "";
   if (!lotId) throw new ApiError(400, "Lot id required.");
   const suffix = pieces[3] || "";
-  if (pieces.length > 4 || (suffix && !["seed", "start", "state"].includes(suffix))) {
+  if (pieces.length > 4 || (suffix && suffix !== "state") || request.method !== "GET") {
     throw new ApiError(404, "Route not found.");
   }
   if (!suffix && request.headers.get("Upgrade") !== "websocket") {
     return json({ error: "Websocket upgrade required." }, 426);
   }
+  if (!isAllowedOrigin(request, url)) throw new ApiError(403, "Origin not allowed.");
   if (!env.ROOM) throw new ApiError(503, "Auction rooms are not configured.");
+  if (!await selectLot(requireDb(env), lotId)) throw new ApiError(404, "Lot not found.");
 
   const stub = env.ROOM.get(env.ROOM.idFromName(lotId));
   return stub.fetch(request);
@@ -194,9 +197,9 @@ async function getOrCreatePaddle(request, env, url) {
   const database = requireDb(env);
   const secret = requireSecret(env);
   const ip = requestIp(request);
-  if (ip) await throttlePaddleIp(database, ip);
-
   const deviceHash = await sha256Hex(deviceId.trim());
+  const existing = await database.prepare("SELECT paddle FROM paddles WHERE device_hash = ?").bind(deviceHash).first();
+  if (ip && !existing) await throttlePaddleIp(database, ip);
   const now = Date.now();
   const paddleRecord = await findOrCreatePaddle(database, deviceHash, now);
   const paddleToken = await issueToken({
@@ -381,6 +384,10 @@ async function createLot(request, env) {
   }
 
   const lotInput = parseLotInput(body, hostAddress);
+  const paddleAuth = await verifyToken(tokenFrom(request, body, "paddleToken", "x-paddle-token"), secret, { type: "paddle" });
+  if (!paddleAuth.ok || paddleAuth.payload.paddle !== lotInput.hostPaddle) {
+    throw new ApiError(401, "Host paddle authorization is invalid or expired.");
+  }
   const proof = await verifyNimiqSignedMessage({
     message: challenge.message,
     walletAddress: hostAddress,
@@ -441,14 +448,13 @@ async function createLot(request, env) {
     lot.createdAt
   ).run();
 
+  let roomReady = false;
   if (env.ROOM) {
     const seeded = await invokeRoom(request, env, lot.id, "/seed", {
       method: "POST",
       body: JSON.stringify(toRoomLot(lot))
-    });
-    if (!seeded.ok) {
-      throw new ApiError(502, "The auction room could not be initialized.");
-    }
+    }).catch(() => null);
+    roomReady = Boolean(seeded?.ok);
   }
 
   const hostToken = await issueToken({
@@ -461,6 +467,7 @@ async function createLot(request, env) {
   return json({
     ok: true,
     lot: toPublicLot(lot),
+    roomReady,
     hostToken,
     hostTokenExpiresAt: new Date(now + HOST_TOKEN_TTL_MS).toISOString()
   }, 201);
@@ -498,12 +505,13 @@ async function leaderboard(env) {
   const bidders = await database.prepare(
     `SELECT p.paddle AS paddle, p.alias AS alias,
             COUNT(*) AS bids,
-            COUNT(DISTINCT b.lot_id) AS rooms
+            COUNT(DISTINCT b.lot_id) AS rooms,
+            (SELECT COUNT(*) FROM lots l WHERE l.winning_paddle = p.paddle AND l.status IN ('sold', 'settled')) AS wins
      FROM paddles p
      JOIN bids b ON b.paddle = p.paddle
      GROUP BY p.paddle, p.alias
-     ORDER BY bids DESC, p.paddle ASC
-     LIMIT 100`
+     ORDER BY wins DESC, bids DESC, p.paddle ASC
+     LIMIT 25`
   ).all();
 
   const winners = await database.prepare(
@@ -536,27 +544,16 @@ async function leaderboard(env) {
 async function listLots(env, url) {
   const database = requireDb(env);
   const limit = parseLimit(url.searchParams.get("limit"));
-  const result = await database.prepare(
-    `SELECT id, title, description, image_url, host_paddle, host_address,
-            start_price_lunas, min_increment_lunas, duration_sec, status,
-            scheduled_at, started_at, ended_at, winning_paddle,
-            winning_bid_lunas, tx_hash, created_at,
-            settle_verified, settle_checked_at, settle_failure
-     FROM lots
-     WHERE status IN ('created', 'live', 'sold', 'settled')
-     ORDER BY
-       CASE status WHEN 'live' THEN 0 WHEN 'created' THEN 1 ELSE 2 END,
-       COALESCE(scheduled_at, created_at) ASC,
-       created_at DESC
-     LIMIT ?`
-  ).bind(limit).all();
-  const lots = (result?.results || []).map(toPublicLot);
-
-  return json({
-    live: lots.filter((lot) => lot.status === "live"),
-    upcoming: lots.filter((lot) => lot.status === "created"),
-    results: lots.filter((lot) => lot.status === "sold" || lot.status === "settled")
-  });
+  const groups = [
+    ["live", "status = 'live'", "started_at DESC"],
+    ["upcoming", "status = 'created'", "COALESCE(scheduled_at, created_at) DESC"],
+    ["results", "status IN ('sold', 'settled', 'passed')", "ended_at DESC"]
+  ];
+  const entries = await Promise.all(groups.map(async ([name, filter, order]) => {
+    const result = await database.prepare(`SELECT * FROM lots WHERE ${filter} ORDER BY ${order}, id ASC LIMIT ?`).bind(limit).all();
+    return [name, (result.results || []).map(toPublicLot)];
+  }));
+  return json(Object.fromEntries(entries));
 }
 
 async function getLot(env, lotId) {
@@ -607,7 +604,7 @@ async function startLot(request, env, lotId) {
     throw new ApiError(started.status === 409 ? 409 : 502, startedBody.error || "The auction could not start.");
   }
 
-  const startedAt = Number(startedBody.serverNow || Date.now());
+  const startedAt = Number(startedBody.startedAt || startedBody.serverNow || Date.now());
   await database.prepare(
     "UPDATE lots SET status = 'live', started_at = ? WHERE id = ? AND status = 'created'"
   ).bind(startedAt, lotId).run();
@@ -649,17 +646,18 @@ async function settleLot(request, env, lotId) {
   if (Number(row.winning_paddle) !== paddle) {
     throw new ApiError(403, "Only the winning paddle can settle this lot.");
   }
-  if (row.status === "settled") {
-    if (row.tx_hash !== txHash) throw new ApiError(409, "This lot already has a different settlement.");
-    return json(settlementResponse({ ...row, status: "settled", tx_hash: row.tx_hash }));
+  if (row.status === "settled" && row.tx_hash === txHash) return json(settlementResponse(row));
+  if (row.status === "settled" && (row.settle_verified || !String(row.settle_failure || "").startsWith("rejected:"))) {
+    throw new ApiError(409, "This lot already has a different settlement. Wait for verification before correcting it.");
   }
 
   const updated = await database.prepare(
     `UPDATE lots
      SET status = 'settled', tx_hash = ?, settle_verified = 0,
          settle_checked_at = NULL, settle_failure = NULL
-     WHERE id = ? AND status = 'sold' AND winning_paddle = ? AND tx_hash IS NULL`
-  ).bind(txHash, lotId, paddle).run();
+     WHERE id = ? AND winning_paddle = ? AND settle_verified = 0
+       AND ((status = 'sold' AND tx_hash IS NULL) OR (status = 'settled' AND tx_hash = ? AND settle_failure LIKE 'rejected:%'))`
+  ).bind(txHash, lotId, paddle, row.tx_hash).run();
 
   if (!hasChanges(updated)) {
     const current = await selectLot(database, lotId);
@@ -669,7 +667,7 @@ async function settleLot(request, env, lotId) {
     throw new ApiError(409, "The lot settlement changed. Try again.");
   }
 
-  return json(settlementResponse({ ...row, status: "settled", tx_hash: txHash }), 201);
+  return json(settlementResponse({ ...row, status: "settled", tx_hash: txHash, settle_verified: 0, settle_checked_at: null, settle_failure: null }), 201);
 }
 
 // On-demand settlement verification. The receipt is labeled pending until
@@ -723,17 +721,19 @@ async function verifyLotSettlement(request, env, lotId) {
     txHash: row.tx_hash,
     hostAddress: row.host_address,
     amountLunas: Number(row.winning_bid_lunas),
+    lotId,
+    network: env.NIMIQ_NETWORK || "testnet",
     rpcUrl: rpcUrlForEnv(env)
   });
 
   if (result.status === SETTLE_STATE.VERIFIED) {
     await database.prepare(
-      `UPDATE lots SET settle_verified = 1, settle_checked_at = ?, settle_failure = NULL WHERE id = ?`
-    ).bind(Date.now(), lotId).run();
+      `UPDATE lots SET settle_verified = 1, settle_checked_at = ?, settle_failure = NULL WHERE id = ? AND tx_hash = ?`
+    ).bind(Date.now(), lotId, row.tx_hash).run();
   } else if (result.status === SETTLE_STATE.REJECTED) {
     await database.prepare(
-      `UPDATE lots SET settle_checked_at = ?, settle_failure = ? WHERE id = ?`
-    ).bind(Date.now(), `rejected:${result.reason}`, lotId).run();
+      `UPDATE lots SET settle_checked_at = ?, settle_failure = ? WHERE id = ? AND tx_hash = ? AND settle_verified = 0`
+    ).bind(Date.now(), `rejected:${result.reason}`, lotId, row.tx_hash).run();
   }
 
   const updated = { ...row, settle_checked_at: Date.now() };
@@ -754,6 +754,7 @@ function settlementStateFor(row, state, result) {
 }
 
 async function getRoomState(request, env, lotId) {
+  if (!await selectLot(requireDb(env), lotId)) throw new ApiError(404, "Lot not found.");
   if (!env.ROOM) throw new ApiError(503, "Auction rooms are not configured.");
   const response = await invokeRoom(request, env, lotId, "/state", { method: "GET" });
   const body = await readResponseJson(response);
@@ -963,6 +964,7 @@ function integerField(value, label, min, max, fallback) {
     if (fallback !== undefined) return fallback;
     throw new ApiError(400, `${label} is required.`);
   }
+  if (typeof value !== "number" && (typeof value !== "string" || !/^\d+$/.test(value))) throw new ApiError(400, `${label} must be an integer.`);
   const number = typeof value === "number" ? value : Number(value);
   if (!Number.isSafeInteger(number) || number < min || number > max) {
     throw new ApiError(400, `${label} must be an integer between ${min} and ${max}.`);
@@ -1015,7 +1017,7 @@ function requireDb(env) {
 
 function requireSecret(env) {
   const secret = env.NIMGAVEL_SECRET || env.PADDLE_SECRET || env.WORKER_SECRET;
-  if (typeof secret !== "string" || secret.length < 16) {
+  if (typeof secret !== "string" || secret.length < 32) {
     throw new ApiError(503, "Worker auth secret is not configured.");
   }
   return secret;
@@ -1039,11 +1041,28 @@ async function readJson(request) {
     throw new ApiError(413, "Request body is too large.");
   }
 
-  const text = await request.text();
-  if (!text.trim()) return {};
-  if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) {
-    throw new ApiError(413, "Request body is too large.");
+  const reader = request.body?.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = "";
+  if (reader) {
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > MAX_BODY_BYTES) {
+          await reader.cancel();
+          throw new ApiError(413, "Request body is too large.");
+        }
+        text += decoder.decode(value, { stream: true });
+      }
+      text += decoder.decode();
+    } finally {
+      reader.releaseLock();
+    }
   }
+  if (!text.trim()) return {};
   try {
     const body = JSON.parse(text);
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -1096,7 +1115,7 @@ function withCors(response, request, url) {
   headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
   headers.set(
     "content-security-policy",
-    "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self' https://rpc.nimiqwatch.com https://rpc.testnet.nimiqwatch.com wss: ws:; frame-ancestors 'none'; base-uri 'self'"
+    `default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://rpc.nimiqwatch.com https://rpc.testnet.nimiqwatch.com ${url.protocol === "https:" ? "wss:" : "ws:"}//${url.host}; frame-ancestors 'none'; base-uri 'self'`
   );
 
   if (!origin || !isAllowedOrigin(request, url)) {

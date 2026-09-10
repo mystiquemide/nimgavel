@@ -3,10 +3,13 @@ import { formatNim } from "../lib/nimiq.js";
 import { escapeHtml, escapeAttr, shortAddress, shortHash } from "./room.js";
 
 export function renderResults(container) {
+  let disposed = false;
   let searchQuery = "";
   const state = { results: null, unreachable: false };
 
-  function chipFor(settle) {
+  function chipFor(settle, status) {
+    if (status === "passed") return `<span class="archive-chip-pending">NO BIDS</span>`;
+    if (!settle) return `<span class="archive-chip-pending">AWAITING PAYMENT</span>`;
     if (settle?.state === "verified") {
       return `
         <span class="archive-chip-verified">
@@ -23,6 +26,7 @@ export function renderResults(container) {
   }
 
   function render() {
+    if (disposed) return;
     const catalog = state.results || [];
     const filtered = catalog.filter((item) => {
       if (!searchQuery) return true;
@@ -54,7 +58,7 @@ export function renderResults(container) {
               </span>
             </div>
             <p class="results-page-desc">
-              Public proof of every hammer price, winning paddle, and on-chain settlement check on Nimiq. Rejected payment attempts stay on the ledger; that is the verification working.
+              Public proof of every hammer price, winning paddle, and on-chain settlement check on Nimiq. Pending and rejected payment references are shown separately from verified transfers.
             </p>
           </div>
 
@@ -142,7 +146,7 @@ export function renderResults(container) {
                   width="800"
                   height="500"
                 />
-                ${chipFor(settle)}
+                ${chipFor(settle, item.status)}
                 <span class="archive-lot-tag">LOT #${catalog.length - index}</span>
               </div>
 
@@ -211,7 +215,7 @@ export function renderResults(container) {
 
   load();
 
-  return function cleanup() { /* listeners die with the DOM */ };
+  return function cleanup() { disposed = true; /* listeners die with the DOM */ };
 }
 
 function formatDate(ts) {

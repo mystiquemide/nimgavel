@@ -21,7 +21,7 @@ export function renderHowItWorks(container) {
             <span class="rule-step-badge">Step 01</span>
             <h3 class="rule-card-title">Pick up your paddle</h3>
             <p class="rule-card-text">
-              Open Nimgavel inside Nimiq Pay. Your device receives an anonymous paddle number and animal alias, like Paddle #42 Quiet Heron. No account, no password.
+              Open Nimgavel inside Nimiq Pay. Your device receives a pseudonymous paddle number and animal alias, like Paddle #42 Quiet Heron. No account, no password.
             </p>
           </article>
           <article class="rule-card rule-card-gold">
@@ -57,7 +57,7 @@ export function renderHowItWorks(container) {
             <strong>The gavel falls.</strong> SOLD to the highest paddle, or the lot passes if nobody met the reserve.
           </li>
           <li>
-            <strong>Winner pays host.</strong> The winner sends the exact amount straight from their wallet to the host address. No escrow, no platform account, no fee.
+            <strong>Winner pays host.</strong> The winner sends the exact amount straight from their wallet to the host address. No escrow or platform account. Review any network fee in the wallet.
           </li>
           <li>
             <strong>Verification.</strong> Nimgavel checks the transaction on the Nimiq blockchain: right recipient, right amount, executed. The receipt is stamped verified, rejected, or pending until the chain answers. Every verdict lands in the public Results Ledger.
@@ -81,9 +81,9 @@ export function renderHowItWorks(container) {
         <h2 id="doc-trust">What Nimgavel does not do</h2>
         <ul class="doc-list">
           <li>No escrow and no custody: payments go wallet to wallet, directly.</li>
-          <li>No fees: bids are free, listings are free, settlement is free.</li>
-          <li>No accounts: your paddle is tied to your device, anonymously.</li>
-          <li>No trust required: every settlement receipt links to its transaction on the public Nimiq blockchain.</li>
+          <li>No platform fees: bids and listings are free. The wallet may charge a network transaction fee.</li>
+          <li>No accounts: your paddle is tied to your device. Public auction activity can be linked across rooms.</li>
+          <li>Trust boundaries: hosts are responsible for their listings and delivery. Verification relies on a public RPC node, and receipts link to the transaction for independent inspection.</li>
         </ul>
       </section>
     </div>

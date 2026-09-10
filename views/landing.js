@@ -5,6 +5,7 @@ import { escapeHtml, escapeAttr, shortAddress } from "./room.js";
 const HERO_POLL_MS = 5000;
 
 export function renderLanding(container) {
+  let disposed = false;
   const state = { lots: null, room: null, timer: null };
 
   container.innerHTML = `
@@ -56,7 +57,7 @@ export function renderLanding(container) {
           </div>
           <h3 class="rule-card-title">Pick up your paddle</h3>
           <p class="rule-card-text">
-            Connect with your Nimiq wallet. Your device receives an anonymous paddle number and animal alias, like Paddle #42 Quiet Heron. No account creation or password setup.
+            Connect with your Nimiq wallet. Your device receives a pseudonymous paddle number and animal alias, like Paddle #42 Quiet Heron. No account creation or password setup.
           </p>
         </article>
 
@@ -350,6 +351,7 @@ export function renderLanding(container) {
       if (!(error instanceof ApiError)) throw error;
       state.lots = null;
     }
+    if (disposed) return;
     renderResults();
 
     const lot = state.lots?.live?.[0];
@@ -362,7 +364,7 @@ export function renderLanding(container) {
     } else {
       state.room = null;
     }
-    renderHeroLot();
+    if (!disposed) renderHeroLot();
   }
 
   // Initial paint, then keep the featured card honest while the page is open.
@@ -378,6 +380,7 @@ export function renderLanding(container) {
   }
 
   return function cleanup() {
+    disposed = true;
     clearInterval(poll);
     if (state.timer) clearInterval(state.timer);
   };

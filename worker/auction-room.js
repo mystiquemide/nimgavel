@@ -1,6 +1,8 @@
 // AuctionRoom Durable Object: the authoritative state machine for one lot.
 // All bid validation and ordering happens here. Single writer, no races.
 
+import { verifyToken } from "./auth.js";
+
 const SOFT_CLOSE_MS = 30_000; // bids inside the final 30s extend by 30s
 const GOING_ONCE_MS = 30_000; // final-call window begins
 const GOING_TWICE_MS = 15_000; // urgency window
@@ -123,21 +125,18 @@ export class AuctionRoom {
     if (!this.lot) return;
 
     if (this.phase === "sold" || this.phase === "passed") {
-      // Finalization path: persist the flag first so a crash mid-finalize
-      // never repeats the D1 writes; the gavel falls even if D1 hiccups.
+      // Finalization path: persist idempotent D1 writes before the flag,
+      // so a crash or D1 outage leaves the result retryable.
       if (!this.finalized) {
+        await this.state.storage.setAlarm(now + 5000);
+        await this.persistToD1({
+          status: this.phase,
+          endedAt: this.endsAt,
+          winningPaddle: this.phase === "sold" ? this.leading?.paddle ?? null : null,
+          winningBidLunas: this.phase === "sold" ? this.currentBid : null,
+        });
         this.finalized = true;
         await this.save();
-        try {
-          await this.persistToD1({
-            status: this.phase,
-            endedAt: now,
-            winningPaddle: this.phase === "sold" ? this.leading?.paddle ?? null : null,
-            winningBidLunas: this.phase === "sold" ? this.currentBid : null,
-          });
-        } catch (e) {
-          console.error("nimgavel: finalization D1 write failed", e);
-        }
         this.broadcast(
           this.phase === "sold"
             ? { type: "sold", winningPaddle: this.leading.paddle, alias: this.leading.alias, amountLunas: this.currentBid, hostAddress: this.lot.hostAddress }
@@ -148,6 +147,7 @@ export class AuctionRoom {
     }
 
     // Phase transition check
+    if (this.startedAt) await this.persistToD1({ status: "live", startedAt: this.startedAt });
     await this.tick(now);
 
     // Re-arm for the next boundary if still running
@@ -174,7 +174,7 @@ export class AuctionRoom {
 
   async placeBid(paddle, alias, amountLunas, now = Date.now()) {
     await this.load();
-    if (!this.lot) throw new RoomError("not_live", "The gavel already fell.");
+    if (!this.lot || now >= this.endsAt) throw new RoomError("not_live", "The gavel already fell.");
     if (!["live", "going_once", "going_twice"].includes(this.phase)) {
       throw new RoomError("not_live", "The gavel already fell.");
     }
@@ -189,7 +189,8 @@ export class AuctionRoom {
       throw new RoomError("outbid_increment", "Bid too large.");
     }
     const session = [...this.sessions.values()].find((s) => s.paddle === paddle);
-    if (session && now - session.lastBidAt < BID_COOLDOWN_MS) {
+    const lastBid = this.bidLog.findLast((bid) => bid.paddle === paddle);
+    if (lastBid && now - lastBid.ts < BID_COOLDOWN_MS) {
       throw new RoomError("rate_limited", "Easy, auctioneer.");
     }
 
@@ -210,7 +211,7 @@ export class AuctionRoom {
     await this.armAlarm(now);
     if (session) session.lastBidAt = now;
 
-    this.broadcast({ type: "bid", paddle, alias, amountLunas, ts: now });
+    this.broadcast({ type: "bid", paddle, alias, amountLunas, ts: now, endsAt: this.endsAt, serverNow: now });
     if (this.phase !== prevPhase && this.phase !== "sold") {
       this.broadcast({ type: "phase", phase: this.phase, endsAt: this.endsAt, serverNow: now });
     }
@@ -248,6 +249,11 @@ export class AuctionRoom {
 
   async handleStart(request) {
     try {
+      await this.load();
+      if (["live", "going_once", "going_twice"].includes(this.phase)) {
+        await this.persistToD1({ status: "live", startedAt: this.startedAt });
+        return Response.json(this.stateMessage());
+      }
       const msg = await this.start();
       return Response.json(msg);
     } catch (e) {
@@ -256,9 +262,10 @@ export class AuctionRoom {
   }
 
   async handleWs(request) {
-    const url = new URL(request.url);
-    const paddle = Number(url.searchParams.get("paddle"));
-    const alias = url.searchParams.get("alias") || "Paddle";
+    if (!this.lot) return Response.json({ error: "Lot not found." }, { status: 404 });
+    if (this.state.getWebSockets().length >= 200) return Response.json({ error: "Room is full." }, { status: 503 });
+    const paddle = 0;
+    const alias = "Spectator";
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
@@ -276,6 +283,10 @@ export class AuctionRoom {
     await this.load();
 
     if (!this.withinMessageCap(server)) return;
+    if (typeof data !== "string" || new TextEncoder().encode(data).length > 4096) {
+      server.close(1009, "Message too large.");
+      return;
+    }
 
     let msg;
     try {
@@ -284,10 +295,19 @@ export class AuctionRoom {
       server.send(JSON.stringify({ type: "error", code: "bad_json", message: "Bad message." }));
       return;
     }
+    if (!msg || typeof msg !== "object") return;
+    if (msg.type === "join") {
+      try { await this.join(server, msg.paddleToken); }
+      catch { server.send(JSON.stringify({ type: "error", code: "invalid_token", message: "Paddle authentication is unavailable. Reconnect your wallet." })); }
+      return;
+    }
     if (msg.type !== "bid") return;
 
     const session = this.sessionFor(server);
     try {
+      if (!session.exp || session.exp <= Date.now() / 1000 || !Number.isSafeInteger(session.paddle) || session.paddle < 1) {
+        throw new RoomError("invalid_token", "Authenticate your paddle before bidding.");
+      }
       await this.placeBid(session.paddle, session.alias, msg.amountLunas);
       // Confirmation is the bid broadcast (own paddle); no separate ack.
     } catch (e) {
@@ -297,13 +317,34 @@ export class AuctionRoom {
     }
   }
 
+  async join(server, token) {
+    const secret = this.env.NIMGAVEL_SECRET || this.env.PADDLE_SECRET || this.env.WORKER_SECRET;
+    const result = typeof secret === "string" && secret.length >= 32
+      ? await verifyToken(token, secret, { type: "paddle" }) : { ok: false };
+    const paddle = result.payload?.paddle;
+    const record = result.ok && Number.isSafeInteger(paddle) && paddle > 0
+      ? await this.env.DB.prepare("SELECT alias FROM paddles WHERE paddle = ? AND device_hash = ?").bind(paddle, result.payload.deviceHash).first() : null;
+    if (!record) {
+      server.send(JSON.stringify({ type: "error", code: "invalid_token", message: "Paddle authorization is invalid or expired." }));
+      return;
+    }
+    const session = this.sessionFor(server);
+    if (session.exp && session.paddle !== paddle) {
+      server.send(JSON.stringify({ type: "error", code: "invalid_token", message: "Reconnect to change paddles." }));
+      return;
+    }
+    Object.assign(session, { paddle, alias: record.alias, exp: result.payload.exp });
+    server.serializeAttachment(session);
+    server.send(JSON.stringify({ type: "joined", paddle, alias: record.alias }));
+  }
+
   async webSocketClose(server) {
     this.sessions.delete(server);
   }
 
   // Flood guard: counts every inbound frame per connection in a rolling
   // window. Over the cap the connection is closed with 1008. Counters are
-  // in-memory; DO hibernation resets them, which only relaxes the guard.
+  // stored in socket attachments to survive Durable Object hibernation.
   withinMessageCap(server) {
     const session = this.sessionFor(server);
     const now = Date.now();
@@ -317,6 +358,7 @@ export class AuctionRoom {
       try { server.close(1008, "Message cap exceeded."); } catch {}
       return false;
     }
+    server.serializeAttachment(session);
     return true;
   }
 
@@ -329,9 +371,10 @@ export class AuctionRoom {
       this.sessions.set(ws, {
         paddle: att.paddle ?? 0,
         alias: att.alias || "Paddle",
+        exp: att.exp,
         lastBidAt: 0,
-        msgCount: 0,
-        msgWindowStart: 0,
+        msgCount: att.msgCount || 0,
+        msgWindowStart: att.msgWindowStart || 0,
       });
     }
     return this.sessions.get(ws);
@@ -364,6 +407,7 @@ export class AuctionRoom {
           }
         : null,
       phase: this.phase,
+      startedAt: this.startedAt,
       endsAt: this.endsAt,
       serverNow: now,
       currentBidLunas: this.currentBid,
@@ -391,7 +435,7 @@ export class AuctionRoom {
     if (patch.winningBidLunas !== undefined) { sets.push("winning_bid_lunas = ?"); args.push(patch.winningBidLunas); }
     if (!sets.length) return;
     args.push(this.lot.id);
-    await this.env.DB.prepare(`UPDATE lots SET ${sets.join(", ")} WHERE id = ?`).bind(...args).run();
+    await this.env.DB.prepare(`UPDATE lots SET ${sets.join(", ")} WHERE id = ? AND status != 'settled'`).bind(...args).run();
 
     if (patch.status === "sold" || patch.status === "passed") {
       // Idempotent: re-finalization after a crash must not duplicate rows.

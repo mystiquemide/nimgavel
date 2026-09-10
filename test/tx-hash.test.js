@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import * as Nimiq from "@nimiq/core";
 import { deriveTxHash, parseSerializedBasicTx } from "../lib/tx-hash.js";
 
-const NETWORKS = [42, 1, 2, 4];
+const NETWORKS = [24, 5, 42, 1, 2, 4];
 
 function hex(bytes) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");

@@ -85,6 +85,6 @@ export function renderNav(container, { activePath = "/" } = {}) {
   // Swap CTA text if opened inside Nimiq Pay webview
   if (typeof window !== "undefined" && window.nimiq) {
     const cta = container.querySelector("#nav-cta-btn span:first-child");
-    if (cta) cta.textContent = "Enter Floor";
+    if (cta && !(isLobby || activePath.startsWith("/room"))) cta.textContent = "Enter Floor";
   }
 }

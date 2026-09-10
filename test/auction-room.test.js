@@ -6,6 +6,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { makeLot, makePaddle, startAuction } from "./fixtures.js";
 
 const BASE = process.env.WRANGLER_URL || "http://127.0.0.1:8799";
 const WS_BASE = BASE.replace(/^http/, "ws");
@@ -23,6 +24,7 @@ const LOT = {
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const paddles = new Map();
 
 async function jf(path, opts) {
   const res = await fetch(`${BASE}${path}`, opts);
@@ -36,17 +38,19 @@ async function jf(path, opts) {
 class Conn {
   constructor(paddle, alias, lotId = LOT.id) {
     this.ws = new WebSocket(
-      `${WS_BASE}/ws/${lotId}?paddle=${paddle}&alias=${encodeURIComponent(alias)}`
+      `${WS_BASE}/ws/${lotId}`
     );
     this.queue = [];
     this.waiters = [];
     this.ws.addEventListener("message", (event) => {
       const msg = JSON.parse(event.data);
+      if (msg.type === "joined") { this.joinedResolve(); return; }
       if (this.waiters.length) this.waiters.shift()(msg);
       else this.queue.push(msg);
     });
     this.open = new Promise((resolve, reject) => {
-      this.ws.addEventListener("open", resolve, { once: true });
+      this.joinedResolve = resolve;
+      this.ws.addEventListener("open", () => this.send({ type: "join", paddleToken: paddles.get(paddle).paddleToken }), { once: true });
       this.ws.addEventListener("error", reject, { once: true });
     });
   }
@@ -96,13 +100,17 @@ class Conn {
 
 test("full auction lifecycle with soft close", async () => {
   // Seed + start
-  await jf(`/ws/${LOT.id}/seed`, { method: "POST", body: JSON.stringify(LOT) });
-  const started = await jf(`/ws/${LOT.id}/start`, { method: "POST" });
-  assert.equal(started.phase, "live");
+  const created = await makeLot(LOT);
+  Object.assign(LOT, created.lot);
+  const alpha = await makePaddle();
+  const bravo = await makePaddle();
+  for (const record of [created.host, alpha, bravo]) paddles.set(record.paddle, record);
+  const started = await startAuction(created);
+  assert.equal(started.state.phase, "live");
 
   // Two paddles connect; both receive initial state
-  const a = new Conn(41, "Alpha");
-  const b = new Conn(42, "Bravo");
+  const a = new Conn(alpha.paddle, "Alpha");
+  const b = new Conn(bravo.paddle, "Bravo");
   await a.open;
   await b.open;
   const stateA = await a.expectType("state");
@@ -113,7 +121,7 @@ test("full auction lifecycle with soft close", async () => {
   assert.ok(stateA.serverNow > 0);
 
   // Host cannot bid on own lot
-  const host = new Conn(7, "Host");
+  const host = new Conn(created.host.paddle, "Host");
   await host.open;
   await host.expectType("state");
   host.send({ type: "bid", amountLunas: 900000 });
@@ -132,7 +140,7 @@ test("full auction lifecycle with soft close", async () => {
   for (let i = 0; i < WAR_BIDS; i++) {
     amount += LOT.minIncrementLunas;
     const bidder = i % 2 === 0 ? a : b;
-    const paddle = i % 2 === 0 ? 41 : 42;
+    const paddle = i % 2 === 0 ? alpha.paddle : bravo.paddle;
     bidder.send({ type: "bid", amountLunas: amount });
     await bidder.confirmBid(paddle, amount);
     if (i % 2 === 1) await sleep(550); // next pair: both paddles clear cooldown
@@ -159,10 +167,10 @@ test("full auction lifecycle with soft close", async () => {
 
   // Extension storm: 5s duration, bids keep landing inside the soft-close
   // window; the room must stay open long past its original end time.
-  const stormLot = { ...LOT, id: `test-storm-${RUN}`, durationSec: 5 };
-  await jf(`/ws/${stormLot.id}/seed`, { method: "POST", body: JSON.stringify(stormLot) });
-  await jf(`/ws/${stormLot.id}/start`, { method: "POST" });
-  const s = new Conn(41, "Alpha", stormLot.id);
+  const storm = await makeLot({ ...LOT, durationSec: 5 }, created.host);
+  const stormLot = storm.lot;
+  await startAuction(storm);
+  const s = new Conn(alpha.paddle, "Alpha", stormLot.id);
   await s.open;
   await s.expectType("state");
 
@@ -180,7 +188,7 @@ test("full auction lifecycle with soft close", async () => {
         await sleep(600);
         break; // cooldown; retry the same amount
       }
-      if (msg.type === "bid" && msg.paddle === 41 && msg.amountLunas === attempt) {
+      if (msg.type === "bid" && msg.paddle === alpha.paddle && msg.amountLunas === attempt) {
         confirmed = true;
         break;
       }
@@ -200,7 +208,7 @@ test("full auction lifecycle with soft close", async () => {
   // Stop bidding: the gavel must fall within the 30s extension window.
   // Phase transitions (going_twice) land first; drain through them.
   const soldMsg = await s.waitFor("sold", 45000);
-  assert.equal(soldMsg.winningPaddle, 41);
+  assert.equal(soldMsg.winningPaddle, alpha.paddle);
   assert.equal(soldMsg.amountLunas, stormAmount);
   assert.equal(soldMsg.hostAddress, stormLot.hostAddress);
 
@@ -208,7 +216,7 @@ test("full auction lifecycle with soft close", async () => {
   const state = await jf(`/ws/${LOT.id}/state`);
   assert.ok(["live", "going_once", "going_twice", "sold", "passed"].includes(state.phase));
   assert.equal(state.currentBidLunas, amount);
-  assert.ok([41, 42].includes(state.leadingPaddle.paddle));
+  assert.ok([alpha.paddle, bravo.paddle].includes(state.leadingPaddle.paddle));
 
   a.close();
   b.close();

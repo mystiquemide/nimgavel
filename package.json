@@ -16,7 +16,7 @@
     "worker:check": "wrangler deploy --dry-run"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.20"
   },
   "license": "MIT",
   "repository": {
@@ -34,5 +34,8 @@
     "@cloudflare/workers-types": "^5.20260728.1",
     "vite": "^7.1.2",
     "wrangler": "^4.40.0"
+  },
+  "overrides": {
+    "sharp": "0.35.4"
   }
 }

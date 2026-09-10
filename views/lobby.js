@@ -9,6 +9,7 @@ const LIVE_POLL_MS = 5_000;
 const APP_ORIGIN = "https://nimgavel.artistic-chip.workers.dev";
 
 export function renderLobby(container) {
+  let disposed = false;
   let activeFilter = "all";
   const state = {
     lots: { live: [], upcoming: [], results: [] },
@@ -154,6 +155,7 @@ export function renderLobby(container) {
   }
 
   function render() {
+    if (disposed) return;
     const liveLots = state.lots.live || [];
     const upcomingLots = state.lots.upcoming || [];
 
@@ -322,7 +324,12 @@ export function renderLobby(container) {
       if (!card) continue;
       const timer = card.querySelector(".lobby-timer-pill .timer-num");
       const rem = roomRemaining(room);
-      if (timer && rem !== null) timer.textContent = formatRemaining(rem);
+      if (timer && rem !== null) {
+        timer.textContent = formatRemaining(rem);
+        const pill = timer.closest(".lobby-timer-pill");
+        pill.dataset.endsAt = room.endsAt;
+        pill.dataset.drift = room.serverNow - Date.now();
+      }
       const nim = card.querySelector(".lobby-bid-nim");
       if (nim && typeof room.currentBidLunas === "number") {
         nim.textContent = `${formatNim(room.currentBidLunas)} NIM`;
@@ -393,6 +400,7 @@ export function renderLobby(container) {
 
   const cleanup = start();
   return function () {
+    disposed = true;
     Promise.resolve(cleanup).then((stop) => stop && stop());
   };
 }

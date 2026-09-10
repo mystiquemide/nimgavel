@@ -11,6 +11,7 @@ import { qrToggleMarkup, wireQrToggle, storeLinksMarkup, walletTroubleCard } fro
 const APP_ORIGIN = "https://nimgavel.artistic-chip.workers.dev";
 
 export function renderRoom(container, lotId) {
+  let disposed = false;
   const state = {
     phase: "loading", // loading | live | going_once | going_twice | sold | passed | settled | gone
     lotTitle: null,
@@ -33,6 +34,7 @@ export function renderRoom(container, lotId) {
     sold: null,
     receipt: null,
     paying: false,
+    paymentAttempt: null,
     tickTimer: null,
     toastTimer: null,
     toast: null
@@ -44,11 +46,12 @@ export function renderRoom(container, lotId) {
   }
 
   function canBid() {
-    return walletReady() && session.paddle !== null && state.socketStatus === "open" &&
+    return walletReady() && session.paddle !== null && session.paddle !== state.hostPaddle && state.socketStatus === "open" &&
       ["live", "going_once", "going_twice"].includes(state.phase);
   }
 
   function render() {
+    if (disposed) return;
     if (state.phase === "gone") {
       renderRoomGone();
       return;
@@ -225,6 +228,8 @@ export function renderRoom(container, lotId) {
       connecting: "Connecting…",
       reconnecting: "Reconnecting to the room…",
       open: "Live Sync Active",
+      authenticating: "Authenticating paddle…",
+      unauthorized: "Paddle expired. Reconnect your wallet.",
       closed: "Connection closed"
     };
     return map[state.socketStatus] || state.socketStatus;
@@ -356,6 +361,15 @@ export function renderRoom(container, lotId) {
   }
 
   function renderWinnerCard() {
+    if (!state.receipt && state.paymentAttempt && !state.paying) return `
+      <div class="winner-settlement-card">
+        <h3>Check your payment before retrying</h3>
+        <p>A wallet request was started. It may already have sent NIM. Do not pay again. Check Nimiq Pay transaction history and record the transaction hash below.</p>
+        <label for="recovery-tx-hash">Payment transaction hash</label>
+        <input class="form-input" id="recovery-tx-hash" maxlength="64" value="${escapeAttr(state.paymentAttempt.txHash || "")}" />
+        <button class="btn-winner-pay" id="btn-record-payment">Record existing payment</button>
+        <button class="btn-inc-pill" id="btn-confirm-unpaid">I checked my wallet: nothing was sent</button>
+      </div>`;
     const amountLunas = state.sold?.amountLunas ?? state.currentBid;
     const nim = formatNim(amountLunas);
     const lunas = amountLunas;
@@ -385,6 +399,7 @@ export function renderRoom(container, lotId) {
               <span class="verified-title">SETTLEMENT REJECTED</span>
             </div>
             <p class="settle-tx-line">${escapeHtml(settle.reason || "The transaction didn't match this auction.")}</p>
+            <button class="btn-inc-pill" id="btn-correct-payment">Correct payment reference</button>
             <a href="https://nimiq.watch/#${escapeAttr(state.receipt.txHash)}" target="_blank" rel="noopener noreferrer" class="btn-view-explorer">
               <span>View transaction on Nimiq Watch</span>
               <span aria-hidden="true">↗</span>
@@ -493,6 +508,22 @@ export function renderRoom(container, lotId) {
 
     const payBtn = container.querySelector("#btn-winner-pay");
     if (payBtn) payBtn.addEventListener("click", payWinner);
+    const unpaidBtn = container.querySelector("#btn-confirm-unpaid");
+    if (unpaidBtn) unpaidBtn.addEventListener("click", () => {
+      if (!window.confirm("Only continue if your wallet shows no pending or completed payment and you cancelled any open payment prompt. Paying twice cannot be undone. Continue?")) return;
+      try { localStorage.removeItem(`nimgavel.payment.${lotId}`); state.paymentAttempt = null; render(); }
+      catch { showToast("Payment recovery storage could not be cleared."); }
+    });
+    const correctBtn = container.querySelector("#btn-correct-payment");
+    if (correctBtn) correctBtn.addEventListener("click", () => { state.paymentAttempt = { txHash: state.receipt.txHash }; state.receipt = null; render(); });
+    const recordBtn = container.querySelector("#btn-record-payment");
+    if (recordBtn) recordBtn.addEventListener("click", async () => {
+      const hash = container.querySelector("#recovery-tx-hash").value.trim().toLowerCase();
+      if (!/^[a-f0-9]{64}$/.test(hash)) { showToast("Enter the 64-character transaction hash from your wallet."); return; }
+      recordBtn.disabled = true;
+      try { await recordPayment(hash); render(); void pollVerification(); }
+      catch (error) { recordBtn.disabled = false; showToast(error.message); }
+    });
 
     const stickyBtn = container.querySelector("#sticky-bid-btn");
     if (stickyBtn) stickyBtn.addEventListener("click", () => placeBid(state.minNext));
@@ -503,7 +534,7 @@ export function renderRoom(container, lotId) {
         if (roomRetry) roomRetry.addEventListener("click", () => {
           resetBoot();
           render();
-          bootWallet().then(() => render());
+          bootWallet().then(() => { if (!disposed) { state.socket?.authenticate(); render(); } });
         });
       } else {
         wireQrToggle({
@@ -522,9 +553,14 @@ export function renderRoom(container, lotId) {
 
   function onMessage(message) {
     if (!message || typeof message !== "object") return;
+    if (typeof message.serverNow === "number") state.clockOffset = message.serverNow - Date.now();
+    if (typeof message.endsAt === "number") state.endsAt = message.endsAt;
     switch (message.type) {
+      case "joined":
+        break;
       case "state":
-        state.phase = message.phase || "live";
+        state.phase = state.receipt ? "settled" : message.phase || "live";
+        if (message.phase === "sold" && message.leadingPaddle) state.sold = { winningPaddle: message.leadingPaddle.paddle, alias: message.leadingPaddle.alias, amountLunas: message.currentBidLunas, hostAddress: state.hostAddress };
         state.endsAt = message.endsAt;
         state.currentBid = message.currentBidLunas || 0;
         state.minNext = message.minNextBidLunas || 0;
@@ -611,33 +647,44 @@ export function renderRoom(container, lotId) {
     if (state.paying) return;
     state.paying = true;
     render();
+    let notice;
     try {
+      state.paymentAttempt = { txHash: null };
+      localStorage.setItem(`nimgavel.payment.${lotId}`, JSON.stringify(state.paymentAttempt));
       const payment = await sendPayment({
         recipient: state.sold.hostAddress || state.hostAddress,
-        nim: formatNim(state.sold.amountLunas)
+        nim: formatNim(state.sold.amountLunas),
+        lotId
       });
-      const settled = await settleLot(lotId, session.paddleToken, payment.txHash);
-      state.phase = "settled";
-      state.receipt = {
-        txHash: payment.txHash,
-        settlement: settled.receipt?.settlement || settled.settlement || { state: "pending" }
-      };
-      showToast("The gavel fell your way. Paid.");
+      state.paymentAttempt = { txHash: payment.txHash };
+      localStorage.setItem(`nimgavel.payment.${lotId}`, JSON.stringify(state.paymentAttempt));
+      await recordPayment(payment.txHash);
+      notice = "Payment recorded. Waiting for on-chain confirmation.";
     } catch (error) {
       if (error instanceof WalletCancelledError) {
-        showToast("Payment cancelled. Pay when ready.");
+        state.paymentAttempt = null;
+        localStorage.removeItem(`nimgavel.payment.${lotId}`);
+        notice = "Payment cancelled. Pay when ready.";
       } else {
-        showToast(`${error.message || "The payment didn't go through."} Nothing was sent.`);
+        notice = error.message || "Payment status is unknown. Check Nimiq Pay before retrying.";
       }
     }
     state.paying = false;
     render();
-    pollVerification();
+    showToast(notice);
+    void pollVerification();
+  }
+
+  async function recordPayment(txHash) {
+    const settled = await settleLot(lotId, session.paddleToken, txHash);
+    state.phase = "settled";
+    state.receipt = { txHash, settlement: settled.receipt?.settlement || { state: "pending" } };
   }
 
   async function pollVerification() {
-    for (let attempt = 0; attempt < 3 && state.receipt?.settlement?.state === "pending"; attempt += 1) {
+    for (let attempt = 0; attempt < 30 && !disposed && state.receipt?.settlement?.state === "pending"; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 4000));
+      if (disposed) return;
       try {
         const result = await verifySettlement(lotId, session.paddleToken);
         if (state.receipt) {
@@ -659,12 +706,15 @@ export function renderRoom(container, lotId) {
   }
 
   async function start() {
+    try { state.paymentAttempt = JSON.parse(localStorage.getItem(`nimgavel.payment.${lotId}`) || "null"); } catch {}
     // Room links are shared directly: boot the wallet here too, not only in
     // the lobby. bootWallet is single-flight, so this is one prompt per page.
     // Plain browsers skip the handshake entirely: spectate is sync-detected.
     if (!isSpectate()) {
       bootWallet().then(() => {
-        if (["live", "going_once", "going_twice", "loading"].includes(state.phase)) render();
+        if (disposed) return;
+        state.socket?.authenticate();
+        render();
       });
     }
 
@@ -716,10 +766,10 @@ export function renderRoom(container, lotId) {
       }
     }
 
+    if (disposed) return;
     state.socket = createRoomSocket({
       lotId,
-      paddle: session.paddle ?? 0,
-      alias: session.alias ?? "Spectator",
+      getPaddleToken: () => session.paddleToken,
       onMessage,
       onStatus: (status) => {
         state.socketStatus = status;
@@ -741,6 +791,7 @@ export function renderRoom(container, lotId) {
   start();
 
   return function cleanup() {
+    disposed = true;
     clearInterval(state.tickTimer);
     if (state.toastTimer) clearTimeout(state.toastTimer);
     if (state.socket) state.socket.close();

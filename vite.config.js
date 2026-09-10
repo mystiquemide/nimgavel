@@ -1,6 +1,8 @@
 import { defineConfig } from "vite";
+import nimiq from "@nimiq/core/vite";
 
 export default defineConfig({
+  plugins: [nimiq()],
   build: {
     target: "es2022",
     outDir: "dist",

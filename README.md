@@ -1,66 +1,62 @@
 # Nimgavel
 
-**Live auctions that settle in NIM. A mini app that runs inside [Nimiq Pay](https://nimiq.com/pay/).**
+Live community auctions inside [Nimiq Pay](https://www.nimiq.com/nimiq-pay). A host lists an item, bidders raise paddles, and the winner pays the host directly in NIM.
 
-👉 **Live:** https://nimgavel.artistic-chip.workers.dev
+[Open the app](https://nimgavel.artistic-chip.workers.dev) · [How it works](https://nimgavel.artistic-chip.workers.dev/how-it-works) · [Results](https://nimgavel.artistic-chip.workers.dev/results)
 
-Nimgavel is a wallet-native live auction room. Communities list a lot, bidders raise numbered paddles, and the winner pays the seller **directly on-chain** — no escrow, no custody, no house cut. Every payout lands on the Nimiq blockchain with a public receipt.
+## Try it
 
-> Going once. Going twice. NIM.
+Browse the auction floor in any browser. To host or bid, use **Open in Nimiq Pay** on your phone, or scan the room's QR code. Allow the wallet and paddle requests, then enter a room.
 
-## How it works
+Hosting signs a one-time wallet challenge. Bids are free. Each bid during the final 30 seconds resets the remaining time to 30 seconds. When bidding ends, only the winning paddle gets the payment action.
 
-1. **Get your paddle** — open Nimgavel inside Nimiq Pay; your device gets a paddle number and alias
-2. **Bid in the room** — one tap bids the next amount; a soft close keeps the door open for counterbids
-3. **Winner pays host** — the winner pays the host directly via a native Nimiq transaction; Nimgavel verifies the payment on-chain and publishes the receipt
+Nimiq Pay handles signing and transfers without exposing private keys to the app. Payments include the lot's reference. The server checks that reference, transaction hash, network, recipient, amount, execution and 60 confirmations before showing a verified receipt. A recorded hash alone is not proof of payment.
 
-## Try it in two minutes
+## Implementation
 
-**In Nimiq Pay (full experience):** open `nimiqpay://miniapp?url=https%3A%2F%2Fnimgavel.artistic-chip.workers.dev%2F` on your phone, or tap **Open in Nimiq Pay** on the landing page.
+- Vanilla JavaScript and Vite frontend, with wallet, spectator, loading and recovery states.
+- Cloudflare Worker API and one Durable Object per auction for ordered bids, WebSockets and close alarms.
+- D1 stores lots, paddles, bid history and receipt verification state.
+- `@nimiq/mini-app-sdk` supplies wallet accounts, message signing, device-scoped paddles and NIM transfers. `@nimiq/core` parses wallet transaction results.
+- A scheduled Worker rechecks pending payments every ten minutes.
 
-**In any browser (spectator):** browse the live room, watch bids land in real time, and explore settled results with public transaction links.
+See [architecture and API](docs/ARCHITECTURE.md) and [deployment](docs/DEPLOY.md).
 
-## What's proven
+## Run locally
 
-| Claim | Evidence |
-|---|---|
-| Bid integrity | Rate limits, minimum increments, host-self-bid rejection — covered by the test suite (19/19) |
-| Soft close | Bids in the final 30s extend the auction; verified in room tests |
-| Crash recovery | Soak test: 105 bids, hard kill of the worker mid-auction, exact state restore, correct winner — `npm run soak` |
-| Settlement verification | Winner's tx checked against a public Nimiq RPC (recipient, amount, execution); cron re-verifies pending settlements |
-| Security | HMAC paddle tokens, wallet-signed host challenges, WS message caps, per-IP throttle, CSP + HSTS + frame-deny headers |
+Requires Node.js 22.20 or newer. Create `.dev.vars` with a random `NIMGAVEL_SECRET` of at least 32 characters. Keep this file private. Set `NIMIQ_RPC_URL=http://127.0.0.1:8899` for the test suite's local RPC fixture. The default network is testnet.
 
-Run everything locally:
-
-```bash
-npm install
-npx wrangler d1 migrations apply nimgavel --local   # local D1
-npx wrangler dev --port 8799 &                      # worker (API + WS)
-npm test                                            # 19 tests (needs the dev server)
+```sh
+npm ci
+npm run build:web
+npm run db:migrate:local
+npm run dev:worker -- --local --test-scheduled
 ```
 
-## Architecture
+Open `http://localhost:8799`. For frontend hot reload, run `npm run dev:web` in another terminal. The Vite proxy forwards the API and WebSockets to port 8799.
 
-This repository contains the Nimgavel backend; the live URL serves the deployed web client.
+## Verification
 
-- **Worker:** Cloudflare Workers — REST API + WebSocket rooms
-- **Rooms:** one Durable Object per auction (authoritative state, soft-close alarms, hibernation-safe)
-- **Data:** D1 (lots, bids, paddles, settlements)
-- **Settlement:** winner-pays-host direct transfer; worker verifies the tx on-chain via public Nimiq RPC ([rpc.nimiqwatch.com](https://rpc.nimiqwatch.com))
+With the local Worker running:
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
+```sh
+npm test
+npm run build:web
+npm run worker:check
+npm audit
+```
 
-## Honest limitations
+The tests exercise signed hosting, authenticated bidding, minimum increments, soft closes, settlement checks, transaction parsing and failure recovery. [Security regression tests](test/security-regressions.test.js) cover authorization bypasses, expired auctions, D1 outages and invalid payment evidence. RPC fixtures are simulated chain responses, not mainnet payment proof.
 
-- Bidding and hosting require Nimiq Pay (the Nimiq wallet app); browsers get spectator mode
-- English ascending auctions only — deterministic bids, no randomness, no pay-per-bid, no raffle
-- Settlement requires the winner to pay; the app verifies but does not enforce payment
-- The Nimiq Pay directory listing is pending (PR to nimiq/awesome); the `nimiqpay://` link works with a one-time confirmation for unlisted apps
+## Limitations
 
-## Real usage
-
-Live auctions run on the deployment above — lots seeded via the real signed-host flow. Settled auctions appear in [the results archive](https://nimgavel.artistic-chip.workers.dev/results) with public tx hashes and on-chain verification state.
+- No escrow, custody, delivery guarantee or payment enforcement. Confirm the item and host before paying. Nimgavel charges no platform fee, but network fees may apply.
+- Paddles identify devices, not unique people or verified wallets. Hosts can use other devices. Auction activity and host addresses are publicly linkable.
+- Verification trusts the configured RPC provider. The live results currently provide no independently confirmed successful auction payment example. Native-wallet compatibility and listing provenance must be checked before relying on a listing.
+- Host-control tokens expire after 24 hours. Start a lot before expiry and keep its browser storage. Lost or expired controls currently have no recovery flow.
+- Lists are bounded to the most recent 50 entries per category. The leaderboard counts archived bids and winning bids, not unique users or paid volume.
+- Local demo scripts create explicitly synthetic fixtures and refuse non-loopback targets. Demo activity does not establish real usage.
 
 ## License
 
-[MIT](LICENSE) — © 2026 MystiqueMide
+[MIT](LICENSE). Third-party libraries and photography retain their own licenses. [Image credits](docs/CREDITS.md).
