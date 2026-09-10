@@ -19,6 +19,8 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run build:web
+
       - name: Start local worker
         run: |
           # The worker returns 503 without an auth secret; CI generates one.
@@ -42,3 +44,10 @@ jobs:
 
       - name: Dependency audit
         run: npm audit --omit=dev
+
+      - name: Bundle hygiene
+        run: |
+          if grep -q "reviewWallet" dist/assets/index-*.js; then
+            echo "::error::dev-only reviewWallet hook leaked into the production bundle"
+            exit 1
+          fi

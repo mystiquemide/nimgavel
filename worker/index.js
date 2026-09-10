@@ -1033,7 +1033,7 @@ function withCors(response, request, url) {
   headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
   headers.set(
     "content-security-policy",
-    "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://rpc.nimiqwatch.com https://rpc.testnet.nimiqwatch.com wss: ws:; frame-ancestors 'none'; base-uri 'self'"
+    "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self' https://rpc.nimiqwatch.com https://rpc.testnet.nimiqwatch.com wss: ws:; frame-ancestors 'none'; base-uri 'self'"
   );
 
   if (!origin || !isAllowedOrigin(request, url)) {

@@ -5,7 +5,9 @@
   "description": "Live community auction house for Nimiq Pay. Going once. Going twice. NIM.",
   "type": "module",
   "scripts": {
-    "dev:worker": "wrangler dev",
+    "dev:web": "vite --host 0.0.0.0 --port 5173",
+    "dev:worker": "wrangler dev --port 8799",
+    "build:web": "vite build",
     "deploy": "wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply nimgavel --local",
     "db:migrate:remote": "wrangler d1 migrations apply nimgavel --remote",
@@ -24,10 +26,12 @@
   "homepage": "https://nimgavel.artistic-chip.workers.dev",
   "dependencies": {
     "@nimiq/core": "^2.7.1",
+    "@nimiq/mini-app-sdk": "^0.1.0",
     "@noble/hashes": "^2.0.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260728.1",
+    "vite": "^7.1.2",
     "wrangler": "^4.40.0"
   }
 }
