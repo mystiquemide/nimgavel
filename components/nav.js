@@ -62,6 +62,7 @@ export function renderNav(container, { activePath = "/" } = {}) {
 
         <div class="mobile-menu-drawer" id="mobile-drawer" aria-hidden="true">
           <a href="/lobby" class="mobile-link">Auction Floor</a>
+          <a href="/host#my-lots-section" class="mobile-link">My Auctions</a>
           <a href="/results" class="mobile-link">Past Results</a>
           <a href="/leaderboard" class="mobile-link">Leaderboard</a>
           <a href="/how-it-works" class="mobile-link">New to Nimiq? Start Here</a>
