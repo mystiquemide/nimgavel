@@ -8,6 +8,7 @@ import {
 } from "../lib/nimiq.js";
 import { session, bootWallet, resetBoot, getBootState, isSpectate, walletReady } from "../lib/session.js";
 import { createRoomSocket } from "../lib/ws.js";
+import { markRecentLot, markJoinedLot } from "../lib/activity.js";
 import { qrToggleMarkup, wireQrToggle, storeLinksMarkup, walletTroubleCard } from "../lib/qr.js";
 
 const APP_ORIGIN = "https://nimgavel.artistic-chip.workers.dev";
@@ -698,6 +699,7 @@ export function renderRoom(container, lotId) {
         state.minNext = message.minNextBidLunas || 0;
         state.leading = normalizeLeading(message.leadingPaddle, message.leadingAlias);
         state.bids = (message.bids || []).slice().reverse();
+        if (session.paddle !== null && state.bids.some((bid) => bid.paddle === session.paddle)) markJoinedLot(lotId);
         state.removedBids = (message.removedBids || []).slice().reverse();
         state.bidCount = message.bidCount ?? state.bids.length;
         state.removedBidCount = message.removedBidCount ?? state.removedBids.length;
@@ -733,6 +735,7 @@ export function renderRoom(container, lotId) {
           amountLunas: message.amountLunas,
           ts: message.ts || Date.now()
         });
+        if (session.paddle !== null && message.paddle === session.paddle) markJoinedLot(lotId);
         state.bids = state.bids.slice(0, 100);
         break;
       case "phase":
@@ -911,6 +914,7 @@ export function renderRoom(container, lotId) {
       }
     }
 
+    markRecentLot(lotId);
     if (disposed) return;
     state.socket = createRoomSocket({
       lotId,
