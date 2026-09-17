@@ -1,5 +1,5 @@
 // How an auction runs: the in-app documentation page. Linked from the nav
-// ("How It Works") so the mechanics are one tap from anywhere.
+// so the mechanics and first-time setup are one tap from anywhere.
 export function renderHowItWorks(container) {
   container.innerHTML = `
     <div class="doc-view">
@@ -8,11 +8,38 @@ export function renderHowItWorks(container) {
           <span aria-hidden="true">←</span>
           <span>Back to Floor</span>
         </a>
-        <h1 class="doc-title">How a Nimgavel auction runs</h1>
+        <h1 class="doc-title">How Nimgavel works</h1>
         <p class="doc-lede">
-          Browse on the web. Bid and host inside Nimiq Pay. Three rules, zero fees, and every settlement checked on-chain.
+          New to Nimiq or already holding NIM, this page shows the full path from browsing a lot to paying the host.
         </p>
       </div>
+
+      <section class="doc-section" id="new-to-nimiq" aria-labelledby="doc-new-to-nimiq">
+        <h2 id="doc-new-to-nimiq">New to Nimiq? Start here</h2>
+        <p>
+          <strong>Nimiq</strong> is the blockchain Nimgavel settles on. <strong>NIM</strong> is its native currency. <strong>Nimiq Pay</strong> is the self-custodial wallet app Nimgavel uses for wallet access, signatures, bidding identity, and winner payments.
+        </p>
+        <ol class="doc-steps">
+          <li>
+            <strong>Browse first.</strong> You can explore the Auction Floor and completed results in a normal web browser without connecting a wallet.
+          </li>
+          <li>
+            <strong>Install Nimiq Pay to bid or host.</strong> Download the wallet on your phone, open it, and complete its normal wallet setup before returning to Nimgavel.
+          </li>
+          <li>
+            <strong>Hand off the page to the app.</strong> On mobile, tap <em>Open in Nimiq Pay</em>. On desktop, use the QR handoff and scan it with your phone. Nimgavel opens the same page inside Nimiq Pay.
+          </li>
+          <li>
+            <strong>Approve your paddle.</strong> Nimiq Pay may ask for wallet or device permission. Once approved, Nimgavel gives your device a pseudonymous paddle so you can bid.
+          </li>
+        </ol>
+        <p class="doc-store-row">
+          Get Nimiq Pay free:
+          <a href="https://apps.apple.com/app/id6471844738" target="_blank" rel="noopener">App Store ↗</a>
+          <a href="https://play.google.com/store/apps/details?id=com.nimiq.pay" target="_blank" rel="noopener">Google Play ↗</a>
+          <a href="https://www.nimiq.com" target="_blank" rel="noopener">Learn about Nimiq ↗</a>
+        </p>
+      </section>
 
       <section class="doc-section" aria-labelledby="doc-rules">
         <h2 id="doc-rules">The three rules</h2>
@@ -68,13 +95,25 @@ export function renderHowItWorks(container) {
       <section class="doc-section" aria-labelledby="doc-wallet">
         <h2 id="doc-wallet">Why Nimiq Pay?</h2>
         <p>
-          Bidding and hosting need a wallet, and Nimiq Pay is the wallet built for exactly this: fast, self-custodial NIM payments with mini apps inside. The web view stays a spectator floor on purpose; your keys never touch it.
+          Bidding and hosting need a wallet, and Nimiq Pay is the wallet Nimgavel integrates with for self-custodial NIM payments and Mini App access. The plain web view stays a spectator floor on purpose; your private keys remain in the wallet app.
         </p>
         <p class="doc-store-row">
           Get Nimiq Pay free:
           <a href="https://apps.apple.com/app/id6471844738" target="_blank" rel="noopener">App Store ↗</a>
           <a href="https://play.google.com/store/apps/details?id=com.nimiq.pay" target="_blank" rel="noopener">Google Play ↗</a>
         </p>
+      </section>
+
+      <section class="doc-section" id="faq" aria-labelledby="doc-faq">
+        <h2 id="doc-faq">First-time questions</h2>
+        <ul class="doc-list">
+          <li><strong>Do I need Nimiq Pay just to browse?</strong> No. Browsing lots, watching rooms, and checking results work in a normal browser. Bidding and hosting happen inside Nimiq Pay.</li>
+          <li><strong>What is NIM?</strong> NIM is the native currency used for Nimgavel auction settlement. If you win, the wallet sends the winning amount directly to the host.</li>
+          <li><strong>How do I move from the website into Nimiq Pay?</strong> On a phone, use Open in Nimiq Pay. On desktop, scan the QR code so the same Nimgavel page opens on your phone inside the wallet.</li>
+          <li><strong>What if the wallet says it did not respond?</strong> Make sure Nimiq Pay is up to date, return to Nimgavel, and use Retry wallet connection. If the app was still initializing, a second attempt should not require recreating the auction or bid.</li>
+          <li><strong>How do I get NIM?</strong> Check the funding and acquisition options available inside Nimiq Pay or use official Nimiq resources. Availability can vary by region and wallet version.</li>
+          <li><strong>Does Nimgavel hold my money?</strong> No. The winner pays the host directly from their wallet. Nimgavel records and verifies the settlement but does not escrow the funds.</li>
+        </ul>
       </section>
 
       <section class="doc-section" aria-labelledby="doc-trust">
