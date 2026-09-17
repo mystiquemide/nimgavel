@@ -1,17 +1,25 @@
 // Public leaderboard: the floor's most active paddles. Paddle numbers are
 // partially masked by the API, so the list shows personas (aliases), not
 // a cross-auction identity index.
-import { ApiError } from "../lib/api.js";
 import { formatNim } from "../lib/nimiq.js";
 import { escapeHtml } from "./room.js";
 
+const REFRESH_MS = 5000;
+
 export function renderLeaderboard(container) {
   let disposed = false;
-  const state = { rows: null, unreachable: false };
+  let refreshTimer = null;
+  const state = { rows: null, unreachable: false, updatedAt: null };
+
+  function freshnessText() {
+    if (!state.updatedAt) return "Live board";
+    const seconds = Math.max(0, Math.round((Date.now() - state.updatedAt) / 1000));
+    return seconds < 5 ? "Updated just now" : `Updated ${seconds}s ago`;
+  }
 
   function render() {
     if (disposed) return;
-    if (state.unreachable) {
+    if (state.unreachable && !state.rows) {
       container.innerHTML = `
         <div class="doc-view">
           <div class="doc-header">
@@ -23,7 +31,7 @@ export function renderLeaderboard(container) {
           </div>
           <div class="quiet-floor-state" data-animate="scale-in">
             <h2 class="quiet-title">Can't reach the auction house right now.</h2>
-            <p class="quiet-desc">Your connection or ours. The board comes back with a refresh.</p>
+            <p class="quiet-desc">Your connection or ours. The board will retry automatically.</p>
           </div>
         </div>
       `;
@@ -42,6 +50,7 @@ export function renderLeaderboard(container) {
             </a>
             <h1 class="doc-title">The Leaderboard</h1>
             <p class="doc-lede">The floor's most active paddles. No names, no wallets, just the chant.</p>
+            <p class="lot-meta" aria-live="polite">${freshnessText()} · refreshes every 5s</p>
           </div>
           <div class="quiet-floor-state" data-animate="scale-in">
             <h2 class="quiet-title">No bids on the board yet.</h2>
@@ -84,6 +93,7 @@ export function renderLeaderboard(container) {
             The floor's most active paddles, ranked by gavels won, then bids raised.
             Paddle numbers stay partially hidden; the alias is the persona.
           </p>
+          <p class="lot-meta" aria-live="polite">${freshnessText()} · refreshes every 5s${state.unreachable ? " · reconnecting" : ""}</p>
         </div>
         <div class="lb-list" data-animate-stagger>
           ${rows}
@@ -92,44 +102,59 @@ export function renderLeaderboard(container) {
     `;
   }
 
-  async function load() {
-    container.innerHTML = `
-      <div class="doc-view">
-        <div class="doc-header">
-          <a href="/lobby" class="btn-back-nav" aria-label="Return to Auction Floor">
-            <span aria-hidden="true">←</span>
-            <span>Back to Floor</span>
-          </a>
-          <h1 class="doc-title">The Leaderboard</h1>
+  async function load({ initial = false } = {}) {
+    if (initial) {
+      container.innerHTML = `
+        <div class="doc-view">
+          <div class="doc-header">
+            <a href="/lobby" class="btn-back-nav" aria-label="Return to Auction Floor">
+              <span aria-hidden="true">←</span>
+              <span>Back to Floor</span>
+            </a>
+            <h1 class="doc-title">The Leaderboard</h1>
+          </div>
+          <div class="lobby-lots-grid" aria-label="Loading the leaderboard">
+            ${[0, 1, 2].map(() => `
+            <div class="lobby-lot-card lobby-skeleton-card" aria-hidden="true">
+              <div class="lobby-card-body" style="padding:20px">
+                <div class="skeleton-line w-70"></div>
+                <div class="skeleton-line w-45"></div>
+                <div class="skeleton-line w-90"></div>
+              </div>
+            </div>`).join("")}
+          </div>
         </div>
-        <div class="lobby-lots-grid" aria-label="Loading the leaderboard">
-          ${[0, 1, 2].map(() => `
-          <div class="lobby-lot-card lobby-skeleton-card" aria-hidden="true">
-            <div class="lobby-card-body" style="padding:20px">
-              <div class="skeleton-line w-70"></div>
-              <div class="skeleton-line w-45"></div>
-              <div class="skeleton-line w-90"></div>
-            </div>
-          </div>`).join("")}
-        </div>
-      </div>
-    `;
+      `;
+    }
+
     try {
-      const response = await fetch("/api/leaderboard");
+      const response = await fetch(`/api/leaderboard?ts=${Date.now()}`, { cache: "no-store" });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error("bad response");
       state.rows = body.leaderboard || [];
-    } catch (error) {
-      if (error instanceof ApiError) {
-        state.unreachable = true;
-      } else {
-        state.unreachable = true;
-      }
+      state.updatedAt = Date.now();
+      state.unreachable = false;
+    } catch {
+      // Keep the last known board visible if a refresh fails. Only show the
+      // full unreachable state when we have never successfully loaded data.
+      state.unreachable = true;
     }
     render();
   }
 
-  load();
+  void load({ initial: true });
+  refreshTimer = setInterval(() => {
+    if (!document.hidden) void load();
+  }, REFRESH_MS);
 
-  return function cleanup() { disposed = true; /* listeners die with the DOM */ };
+  const onVisibilityChange = () => {
+    if (!document.hidden) void load();
+  };
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  return function cleanup() {
+    disposed = true;
+    if (refreshTimer) clearInterval(refreshTimer);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+  };
 }
