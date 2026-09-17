@@ -1,5 +1,6 @@
 import { listLots, getRoomState, ApiError } from "../lib/api.js";
 import { formatNim } from "../lib/nimiq.js";
+import { getRecentLotIds, getJoinedLotIds } from "../lib/activity.js";
 import { escapeHtml, escapeAttr, shortAddress } from "./room.js";
 
 const HERO_POLL_MS = 10000;
@@ -40,6 +41,37 @@ export function renderLanding(container) {
           <div id="hero-lot-slot"><div class="hero-lot-loading">checking the floor…</div></div>
         </div>
       </div>
+    </section>
+
+    <section class="rules-section" id="your-auctions" aria-labelledby="your-auctions-heading">
+      <div class="rules-header" data-animate="fade-up">
+        <span class="rules-kicker">YOUR NIMGAVEL</span>
+        <h2 id="your-auctions-heading" class="rules-title">Start here or pick up where you left off.</h2>
+        <p class="rules-subhead">Open the floor, return to auctions you joined, or jump back into rooms you recently viewed without finding the old link again.</p>
+      </div>
+
+      <div class="rules-grid" data-animate-stagger>
+        <article class="rule-card rule-card-white" data-animate-child>
+          <div class="rule-badge-row"><span class="rule-step-badge">HOST</span></div>
+          <h3 class="rule-card-title">My Auctions</h3>
+          <p class="rule-card-text">Find the rooms you created and manage them from one place.</p>
+          <a href="/host#my-lots-section" class="btn-card-action"><span>Open My Auctions</span><span aria-hidden="true">→</span></a>
+        </article>
+
+        <article class="rule-card rule-card-gold" id="joined-auctions" data-animate-child>
+          <div class="rule-badge-row"><span class="rule-step-badge rule-badge-primary">BIDDER</span></div>
+          <h3 class="rule-card-title">Joined Auctions</h3>
+          <div id="joined-auctions-list"><p class="rule-card-text">Auctions you bid in will appear here.</p></div>
+        </article>
+
+        <article class="rule-card rule-card-green" id="recent-auctions" data-animate-child>
+          <div class="rule-badge-row"><span class="rule-step-badge rule-badge-green">RECENT</span></div>
+          <h3 class="rule-card-title">Recently Viewed</h3>
+          <div id="recent-auctions-list"><p class="rule-card-text">Rooms you open will appear here for quick return.</p></div>
+        </article>
+      </div>
+
+      <p class="hero-boundary-note" data-animate="fade-up"><a href="/lobby">Auction Floor</a> · <a href="/host">Host an Auction</a> · <a href="/how-it-works">How It Works</a></p>
     </section>
 
     <!-- SECTION 3: HOW A NIMGAVEL AUCTION RUNS -->
@@ -220,6 +252,33 @@ export function renderLanding(container) {
 
   const lotSlot = container.querySelector("#hero-lot-slot");
   const resultsGrid = container.querySelector("#landing-results-grid");
+  const joinedList = container.querySelector("#joined-auctions-list");
+  const recentList = container.querySelector("#recent-auctions-list");
+
+  function lotMap() {
+    const groups = state.lots ? [state.lots.upcoming || [], state.lots.live || [], state.lots.results || []] : [];
+    return new Map(groups.flat().map((lot) => [lot.id, lot]));
+  }
+
+  function activityRows(ids, emptyText) {
+    if (!ids.length) return `<p class="rule-card-text">${escapeHtml(emptyText)}</p>`;
+    const lots = lotMap();
+    return ids.slice(0, 4).map((id) => {
+      const lot = lots.get(id);
+      const title = lot?.title || `Auction ${id.slice(0, 8)}`;
+      const status = lot?.status ? ` · ${lot.status}` : "";
+      return `<a href="/room/${escapeAttr(id)}" class="btn-card-action" style="margin-top:8px"><span>${escapeHtml(title)}${escapeHtml(status)}</span><span aria-hidden="true">→</span></a>`;
+    }).join("");
+  }
+
+  function renderActivity() {
+    if (!joinedList || !recentList) return;
+    const joinedIds = getJoinedLotIds();
+    const joined = new Set(joinedIds);
+    const recentIds = getRecentLotIds().filter((id) => !joined.has(id));
+    joinedList.innerHTML = activityRows(joinedIds, "Auctions you bid in will appear here.");
+    recentList.innerHTML = activityRows(recentIds, "Rooms you open will appear here for quick return.");
+  }
 
   function renderHeroLot() {
     const lot = state.lots?.live?.[0];
@@ -400,6 +459,7 @@ export function renderLanding(container) {
     }
     if (disposed) return;
     renderResults();
+    renderActivity();
 
     const lot = state.lots?.live?.[0];
     if (lot) {
@@ -413,6 +473,9 @@ export function renderLanding(container) {
     }
     if (!disposed) renderHeroLot();
   }
+
+  // Activity shortcuts work immediately from local usage history, then gain titles/status after the floor loads.
+  renderActivity();
 
   // Initial paint, then keep the featured card honest while the page is open.
   refresh();
