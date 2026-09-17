@@ -121,11 +121,13 @@ Paddle #42 · Quiet Heron
 
 **LIVE** — Before the first bid, the bidder must acknowledge the host's published fulfillment terms.
 
-**LIVE** — The first bid requires a wallet authorization signature. Nimgavel derives the balance-checked Nimiq address from the actual signing public key instead of assuming the first account returned by the wallet is the intended bidder account.
+**LIVE** — The first bid requires a Nimiq Pay wallet authorization signature. Nimgavel keeps a bounded set of NIM addresses shared by Nimiq Pay, binds that account set into the signed bidder proof, and checks those accounts individually on Nimiq mainnet. One account must independently cover the proposed bid; balances are never summed across accounts.
 
-**LIVE** — Nimgavel checks the wallet's live NIM balance before the bid enters the auction engine. Funds remain in the bidder's wallet until settlement.
+**LIVE** — Funds remain in the bidder's wallet until settlement. The balance check is an access guard, not a lock or escrow.
 
-**RECORDED** — A mainnet tester who previously hit a false balance failure retested after the signing-wallet fix and confirmed: “have checked it, it worked.”
+**RECORDED** — One earlier mainnet tester who hit a false balance failure retested and confirmed the flow worked after a fix. A later independent mobile tester still reported a `0 NIM` block, so cross-device and multi-account validation remains open.
+
+**PENDING PROOF** — Retest the current multi-account balance path with the users who reported false `0 NIM` before treating the balance gate as fully validated on real devices.
 
 ### 3. Soft close
 
@@ -184,7 +186,7 @@ Nimiq Pay is not a checkout button attached to the end of Nimgavel. It is requir
 | --- | --- | --- |
 | Host signature | Nimiq Pay signs the host authorization used to create/control the lot | **LIVE** |
 | Paddle identity | Nimiq Pay's Mini App device identifier produces the device-scoped identity used to issue a pseudonymous paddle | **LIVE** |
-| Bidder access | Nimiq Pay signs the first-bid authorization; Nimgavel derives the signer address and performs the balance gate | **LIVE** |
+| Bidder access | Nimiq Pay shares the user's NIM account set and signs the first-bid authorization; Nimgavel checks the signed account set on-chain before admitting the bid | **LIVE / PENDING PROOF** |
 | Winner payment | Nimiq Pay signs and sends the native NIM payment directly to the host with the auction reference | **LIVE** |
 | Settlement verification | The Nimiq Pay payment creates the referenced transaction; Nimgavel then verifies it against Nimiq mainnet via JSON-RPC | **LIVE** |
 
@@ -198,9 +200,13 @@ Nimiq Pay is not a checkout button attached to the end of Nimgavel. It is requir
 
 ### Balance-backed bidding
 
-**LIVE** — A bidder cannot raise the auction price with a wallet that lacks enough NIM for the proposed bid at that moment.
+**LIVE** — A bidder cannot raise the auction price unless at least one NIM address shared by Nimiq Pay has enough NIM for the proposed bid at that moment.
+
+**LIVE** — Shared accounts are checked individually. Nimgavel does not combine several smaller balances to satisfy one bid.
 
 **LIVE** — The balance is not locked. The check prevents zero-balance price inflation but does not guarantee that funds remain available until settlement.
+
+**PENDING PROOF** — Automated coverage is green, but real-device validation remains open for the Nimiq Pay account configurations that produced false `0 NIM` reports during user testing.
 
 ### Minimum increments
 
@@ -234,6 +240,7 @@ The final submission should let a judge inspect every important claim without re
 | Two-device live auction recording | **PENDING PROOF** |
 | Soft-close recording | **PENDING PROOF** |
 | Bid-removal recording | **PENDING PROOF** |
+| Multi-account funded-wallet bid retest on real devices | **PENDING PROOF** |
 | One genuine verified mainnet NIM payment | **PENDING PROOF** |
 | User-testing evidence | **RECORDED** |
 
@@ -244,7 +251,7 @@ host signs
    ↓
 bidder gets a paddle
    ↓
-bidder authorizes the signing wallet
+bidder authorizes the shared NIM account set
    ↓
 live bidding
    ↓
@@ -305,7 +312,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper protocol and A
 
 ## Tested with early users on Nimiq mainnet
 
-**RECORDED** — Early users have created auction rooms, entered rooms on mobile, connected Nimiq Pay, placed bids, navigated the auction surfaces and exercised the mainnet flow.
+**RECORDED** — Early users have created auction rooms, entered rooms on mobile, connected Nimiq Pay, navigated the auction surfaces and exercised the mainnet flow. Some users successfully placed bids, while balance-backed bidder access is still being retested across Nimiq Pay account configurations.
 
 > “The UI is smooth, there’s a beginner guide, and it’s so easy to navigate.”  
 > — Early mobile user
@@ -316,6 +323,9 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper protocol and A
 > “Basically, your own mini auction house, powered by Nimiq.”  
 > — First-time Nimgavel user
 
+> “Overall user experience on mobile was okay. I didn’t need an explainer to understand.”  
+> — Mobile Nimiq Pay tester
+
 **RECORDED** — One tester rated their experience **95.9/100**, specifically praising the UI, brand consistency and working navigation. This is one tester's rating, not an aggregate product score.
 
 ## User feedback changed the product
@@ -323,8 +333,10 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper protocol and A
 | User feedback | What changed | Status |
 | --- | --- | --- |
 | Wallet connection could take too long or require a refresh | Added bounded provider/account states, late-provider recovery and a retry path | **LIVE** |
-| A funded mainnet wallet was incorrectly read as having 0 NIM | Corrected network handling, then bound the balance check to the actual signing key instead of assuming the first wallet account | **LIVE / RECORDED** |
-| The same balance tester retested after the fix | Tester confirmed the flow worked | **RECORDED** |
+| A funded mainnet wallet was incorrectly read as having 0 NIM | Corrected mainnet handling, hardened RPC parsing/retries, and moved bidder proof from a single assumed address to the bounded account set shared by Nimiq Pay | **LIVE / PENDING PROOF** |
+| One balance tester retested after an earlier fix | Tester confirmed the flow worked | **RECORDED** |
+| Another independent mobile tester could host successfully but was blocked from bidding by a `0 NIM` result | Multi-account bidder proof is deployed and CI is green; the affected real-device configurations still need current-build retesting | **PENDING PROOF** |
+| Mobile users said the core site was understandable without an explainer | Kept onboarding lightweight and preserved the direct create/bid/settle navigation model | **RECORDED** |
 | Winner cancellation could leave payment recovery in a confusing state | Normalized explicit cancellation and preserved safe unknown-payment recovery | **LIVE** |
 | Auction Floor / Results were slow on mobile | Removed embedded base64 photos from list responses and serve lot images separately through cacheable image endpoints | **LIVE** |
 | Recent hammer results moved while someone was still reading them | Reduced disruptive refresh behavior and only rebuild the section when the result data actually changes | **LIVE** |
@@ -346,8 +358,10 @@ Nimgavel can prove substantially more about the auction and NIM payment than it 
 - **LIVE** — winning paddle
 - **LIVE** — published fulfillment terms
 - **LIVE** — bidder acknowledgement of those terms
-- **LIVE** — balance availability at bid time
+- **LIVE** — balance gate at bid time
 - **LIVE** — matching NIM settlement evidence
+
+**PENDING PROOF** — The balance gate is deployed and covered by automated tests, but real-device validation is still open for the Nimiq Pay account layouts that produced false `0 NIM` reports.
 
 ### What Nimgavel does not currently guarantee
 
@@ -400,6 +414,8 @@ Core automated coverage includes:
 
 - **TESTED** — signed hosting
 - **TESTED** — authenticated bidding
+- **TESTED** — strict Nimiq RPC balance parsing and retry behavior
+- **TESTED** — multi-account balance-backed bidder proofs
 - **TESTED** — minimum increments
 - **TESTED** — soft close
 - **TESTED** — bid removal and withdrawal
