@@ -223,7 +223,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper protocol and A
 
 | Surface | What it does |
 | --- | --- |
-| Home | Introduces Nimgavel and directs users into the auction flow |
+| Home | Introduces Nimgavel, exposes app-first shortcuts, and lets users return to joined or recently viewed auctions |
 | Auction Floor | Browse live, upcoming and completed lots |
 | Auction Room | Timer, leader, bids, removals, fulfillment and settlement |
 | Host | Create and control an auction, with a direct mobile shortcut back to your auctions |
@@ -266,6 +266,7 @@ A separate user rated their experience **95.9/100**, specifically praising the U
 | **User 6** | Wanted delivery/collection terms agreed before bidding and asked how to complain if an item arrives late or never arrives | Added fulfillment terms before bidding, explicit bidder acknowledgement, and expanded the roadmap for delivery status and complaints |
 | **User 7** | Asked what assurance a buyer has after paying and compared the experience to Amazon | Clarified that Nimgavel verifies auction/payment evidence but does not currently guarantee physical delivery, provide escrow or arbitrate disputes |
 | **User 8** | Said hosted auctions were hard to find quickly on mobile and suggested a My Auctions button in the sidebar | Added a My Auctions shortcut to the mobile drawer that jumps directly to the user's auction section |
+| **User 9** | Said someone discovering Nimgavel inside Nimiq Pay first would struggle to find their way back to auctions without website context | Added an app-first home section with My Auctions, Joined Auctions and Recently Viewed, plus a Recent & Joined shortcut in the mobile drawer. Room visits and successful bid participation are remembered locally for direct return links |
 
 This feedback came from real product usage and has directly shaped the current flow.
 
