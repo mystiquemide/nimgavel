@@ -10,6 +10,8 @@ This roadmap describes proposed work, not shipped capabilities. Progress depends
 - Test balance-backed bidding with wallets that have enough NIM and wallets that do not.
 - Complete at least one genuine auction from listing through verified payment.
 - Confirm that fulfillment terms are visible before bidding and again to the winner after the auction.
+- Confirm bidders cannot place a first bid until they explicitly acknowledge the published delivery / collection terms.
+- Confirm hosts are prompted to publish the fulfillment method, service area or collection location context, expected timeframe, costs, and handoff method without exposing a private home address.
 - Capture a successful auction payment receipt and a reproducible walkthrough.
 - Confirm listing provenance. Clearly label demonstrations so users cannot mistake them for available goods.
 - Confirm submission eligibility, registration, and required promotion.
@@ -41,18 +43,25 @@ These improvements follow verification of the deployed native-wallet payment flo
 
 ## Phase 2: Fulfillment and post-auction coordination
 
-Nimgavel currently makes hosts publish delivery terms before bidding. If real users continue using the product, extend that into a proper post-auction workflow without turning the product into a logistics company.
+Nimgavel currently makes hosts publish delivery terms before bidding and requires bidders to acknowledge those terms before placing a first bid. If real users continue using the product, extend that into a proper post-auction workflow without turning the product into a logistics company.
 
 - Private host-winner contact exchange after a verified settlement.
+- Structured fulfillment terms instead of only free text: delivery / collection area, estimated timeframe, shipping responsibility, collection window, digital handoff method, and optional cost notes.
+- Snapshot the exact fulfillment terms accepted by the winning bidder so later edits cannot rewrite what was agreed.
 - Delivery-status states such as awaiting fulfillment, shipped, ready for pickup, delivered, and digital delivery completed.
 - Optional shipping references or tracking links supplied by the host.
 - Winner delivery confirmation.
 - Host and winner activity history tied to the auction record.
 - Clear handling for digital goods, local pickup, and physical shipping.
 - A lightweight issue-reporting flow for delivery disputes.
+- Complaint categories such as late delivery, item not received, wrong item, damaged item, or digital delivery missing.
+- Timestamp complaints, preserve the relevant auction / payment / fulfillment record, and allow the host to respond without rewriting the original complaint.
+- Support optional evidence attachments or external tracking references with clear privacy limits.
+- Define complaint states such as opened, host responded, resolved by parties, and unresolved. Do not label a dispute as adjudicated unless Nimgavel actually introduces a trusted resolution process.
+- Give both parties a downloadable or shareable record of the auction terms, verified payment, fulfillment status, and complaint timeline.
 - Privacy controls so home addresses and private contact information are never exposed publicly.
 
-**Trust boundary:** Nimgavel can record fulfillment claims and status changes, but it must not present them as proof that an item was authentic, delivered correctly, or received in the promised condition unless a future verification mechanism actually establishes that.
+**Trust boundary:** Nimgavel can record fulfillment claims, accepted terms, complaint history, and status changes, but it must not present them as proof that an item was authentic, delivered correctly, or received in the promised condition unless a future verification mechanism actually establishes that.
 
 ## Phase 3: Support community organizers
 
@@ -62,7 +71,7 @@ Build these capabilities when returning hosts demonstrate a need:
 - Multi-lot auction events.
 - Shareable schedules and opt-in reminders.
 - Team controls for organizers running auctions together.
-- Payment-status, fulfillment-status, and receipt exports.
+- Payment-status, fulfillment-status, complaint-status, and receipt exports.
 - Branded event pages for recurring community auctions.
 
 **Progress signal:** organizers return to run additional auctions and can identify which tools would remove their current operational friction.
@@ -72,7 +81,7 @@ Build these capabilities when returning hosts demonstrate a need:
 - Clearly distinguish wallet ownership from seller reputation.
 - Add stronger item-provenance fields and supporting evidence.
 - Add reporting and moderation tools.
-- Base reputation on meaningful completed auctions, verified settlements, and fulfillment history rather than raw bid counts.
+- Base reputation on meaningful completed auctions, verified settlements, fulfillment history, and unresolved delivery complaints rather than raw bid counts.
 - Detect repeated unpaid wins and other obvious abuse patterns without turning pseudonymous participation into invasive identity collection.
 
 ### Stronger bid commitment
