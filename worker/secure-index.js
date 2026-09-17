@@ -12,8 +12,11 @@ import { BalanceLookupError, fetchNimBalance } from "./nimiq-balance.js";
 import {
   BIDDER_PROOF_TTL_MS,
   BIDDER_PROOF_VERSION,
+  BIDDER_PROOF_VERSION_V3,
   bidderAuthorizationMessage,
-  bidderAuthorizationMessageV2
+  bidderAuthorizationMessageV2,
+  bidderAuthorizationMessageV3,
+  canonicalWalletAddresses
 } from "../lib/bidder-proof.js";
 
 const MAINNET_RPC_URL = "https://rpc.nimiqwatch.com";
@@ -105,20 +108,26 @@ export class AuctionRoom extends BaseAuctionRoom {
       return super.webSocketMessage(server, data);
     }
 
-    let walletAddress = null;
+    let walletAddresses = [];
     try {
-      walletAddress = await this.authorizeBidderWallet(session, message.bidderProof);
-      const balanceLunas = await fetchNimBalance(walletAddress, rpcUrlForEnv(this.env));
-      if (balanceLunas === 0) {
+      walletAddresses = await this.authorizeBidderWallet(session, message.bidderProof);
+      const backing = await findBackingBalance(
+        walletAddresses,
+        message.amountLunas,
+        rpcUrlForEnv(this.env)
+      );
+
+      if (!backing.sufficient) {
+        if (walletAddresses.length === 1 && backing.balanceLunas === 0) {
+          throw new BidGuardError(
+            "insufficient_balance",
+            `Nimgavel checked ${backing.address} on Nimiq mainnet twice and the chain reported 0 NIM. Make sure this exact NIM account is the one you funded in Nimiq Pay, then retry.`
+          );
+        }
+
         throw new BidGuardError(
           "insufficient_balance",
-          `Nimgavel checked ${walletAddress} on Nimiq mainnet twice and the chain reported 0 NIM. Make sure this exact NIM account is the one you funded in Nimiq Pay, then retry.`
-        );
-      }
-      if (balanceLunas < message.amountLunas) {
-        throw new BidGuardError(
-          "insufficient_balance",
-          `Nimgavel checked ${shortWalletAddress(walletAddress)} and found ${formatNim(balanceLunas)} NIM spendable on-chain. This bid needs at least ${formatNim(message.amountLunas)} NIM.`
+          `Nimgavel checked ${walletAddresses.length} Nimiq Pay account${walletAddresses.length === 1 ? "" : "s"}. The highest spendable balance found was ${formatNim(backing.balanceLunas)} NIM on ${shortWalletAddress(backing.address)}. This bid needs at least ${formatNim(message.amountLunas)} NIM.`
         );
       }
     } catch (error) {
@@ -126,8 +135,8 @@ export class AuctionRoom extends BaseAuctionRoom {
       let text;
       if (error instanceof BidGuardError) {
         text = error.message;
-      } else if (error instanceof BalanceLookupError && walletAddress) {
-        text = `Nimgavel could not read the on-chain balance for ${shortWalletAddress(walletAddress)} after retrying. Your wallet was not treated as 0 NIM. Please try again.`;
+      } else if (error instanceof BalanceLookupError && walletAddresses.length) {
+        text = `Nimgavel could not verify all shared Nimiq Pay balances after retrying. Your wallet was not treated as 0 NIM. Please try again.`;
       } else {
         text = "Nimgavel could not verify your live NIM balance. Please try the bid again.";
       }
@@ -140,8 +149,11 @@ export class AuctionRoom extends BaseAuctionRoom {
 
   async authorizeBidderWallet(session, proof) {
     const now = Date.now();
+    if (Array.isArray(session.bidderWalletAddresses) && session.bidderWalletAddresses.length && session.bidderProofExpiresAt > now) {
+      return session.bidderWalletAddresses;
+    }
     if (session.bidderWallet && session.bidderProofExpiresAt > now) {
-      return session.bidderWallet;
+      return [session.bidderWallet];
     }
 
     if (!proof || typeof proof !== "object") {
@@ -156,15 +168,25 @@ export class AuctionRoom extends BaseAuctionRoom {
       throw new BidGuardError("bidder_auth_required", "Bidder wallet authorization expired. Confirm your wallet again.");
     }
 
-    let walletAddress;
+    let verificationAddress;
+    let walletAddresses;
     let expectedMessage;
     try {
-      if (Number(proof.version) === BIDDER_PROOF_VERSION) {
-        // V2 trusts the cryptographic signer, not listAccounts()[0]. Nimiq Pay
-        // can expose multiple addresses, so derive the exact checked address
-        // from the public key that approved this bid authorization.
-        walletAddress = walletAddressFromPublicKey(proof.publicKey);
-        if (!walletAddress) throw new Error("invalid signer");
+      if (Number(proof.version) === BIDDER_PROOF_VERSION_V3) {
+        verificationAddress = walletAddressFromPublicKey(proof.publicKey);
+        walletAddresses = canonicalWalletAddresses(proof.walletAddresses);
+        if (!verificationAddress || !walletAddresses.length) throw new Error("invalid v3 proof");
+        expectedMessage = bidderAuthorizationMessageV3({
+          lotId: this.lot.id,
+          paddle: session.paddle,
+          walletAddresses,
+          expiresAt
+        });
+      } else if (Number(proof.version) === BIDDER_PROOF_VERSION) {
+        // V2 checks only the cryptographic signer. Kept for already-open tabs.
+        verificationAddress = walletAddressFromPublicKey(proof.publicKey);
+        if (!verificationAddress) throw new Error("invalid signer");
+        walletAddresses = [verificationAddress];
         expectedMessage = bidderAuthorizationMessageV2({
           lotId: this.lot.id,
           paddle: session.paddle,
@@ -172,12 +194,13 @@ export class AuctionRoom extends BaseAuctionRoom {
         });
       } else if (proof.version === undefined || proof.version === null || Number(proof.version) === 1) {
         // Rolling-deploy compatibility for tabs that still have the v1 client.
-        walletAddress = normalizeNimiqAddress(proof.walletAddress);
-        if (!walletAddress) throw new Error("invalid wallet");
+        verificationAddress = normalizeNimiqAddress(proof.walletAddress);
+        if (!verificationAddress) throw new Error("invalid wallet");
+        walletAddresses = [verificationAddress];
         expectedMessage = bidderAuthorizationMessage({
           lotId: this.lot.id,
           paddle: session.paddle,
-          walletAddress,
+          walletAddress: verificationAddress,
           expiresAt
         });
       } else {
@@ -189,7 +212,7 @@ export class AuctionRoom extends BaseAuctionRoom {
 
     const verified = await verifyNimiqSignedMessage({
       message: expectedMessage,
-      walletAddress,
+      walletAddress: verificationAddress,
       publicKey: proof.publicKey,
       signature: proof.signature
     });
@@ -199,10 +222,38 @@ export class AuctionRoom extends BaseAuctionRoom {
 
     // Cache only on this authenticated socket. A reconnect must present the
     // signed proof again, while repeated bids in the same room stay seamless.
-    session.bidderWallet = walletAddress;
+    session.bidderWallet = verificationAddress;
+    session.bidderWalletAddresses = walletAddresses;
     session.bidderProofExpiresAt = expiresAt;
-    return walletAddress;
+    return walletAddresses;
   }
+}
+
+async function findBackingBalance(walletAddresses, requiredLunas, rpcUrl) {
+  let best = { address: walletAddresses[0] || null, balanceLunas: -1 };
+  let lookupFailed = false;
+
+  for (const address of walletAddresses) {
+    try {
+      const balanceLunas = await fetchNimBalance(address, rpcUrl);
+      if (balanceLunas > best.balanceLunas) best = { address, balanceLunas };
+      if (balanceLunas >= requiredLunas) {
+        return { sufficient: true, address, balanceLunas };
+      }
+    } catch (error) {
+      if (!(error instanceof BalanceLookupError)) throw error;
+      lookupFailed = true;
+    }
+  }
+
+  if (best.balanceLunas < 0 || lookupFailed) {
+    throw new BalanceLookupError(
+      "wallet_set_unavailable",
+      "One or more Nimiq Pay account balances could not be verified."
+    );
+  }
+
+  return { sufficient: false, ...best };
 }
 
 async function listLotsLightweight(env, url) {
