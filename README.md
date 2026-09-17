@@ -125,9 +125,9 @@ Paddle #42 · Quiet Heron
 
 **LIVE** — Funds remain in the bidder's wallet until settlement. The balance check is an access guard, not a lock or escrow.
 
-**RECORDED** — One earlier mainnet tester who hit a false balance failure retested and confirmed the flow worked after a fix. A later independent mobile tester still reported a `0 NIM` block, so cross-device and multi-account validation remains open.
+**RECORDED** — One earlier mainnet user who hit a false balance failure used the flow again after a fix and confirmed it worked. A later independent mobile user still reported a `0 NIM` block, so cross-device and multi-account validation remains open.
 
-**PENDING PROOF** — Retest the current multi-account balance path with the users who reported false `0 NIM` before treating the balance gate as fully validated on real devices.
+**PENDING PROOF** — Verify the current multi-account balance path again with the users who reported false `0 NIM` before treating the balance gate as fully validated on real devices.
 
 ### 3. Soft close
 
@@ -206,7 +206,7 @@ Nimiq Pay is not a checkout button attached to the end of Nimgavel. It is requir
 
 **LIVE** — The balance is not locked. The check prevents zero-balance price inflation but does not guarantee that funds remain available until settlement.
 
-**PENDING PROOF** — Automated coverage is green, but real-device validation remains open for the Nimiq Pay account configurations that produced false `0 NIM` reports during user testing.
+**PENDING PROOF** — Automated coverage is green, but real-device validation remains open for the Nimiq Pay account configurations that produced false `0 NIM` reports during live use.
 
 ### Minimum increments
 
@@ -240,9 +240,9 @@ The final submission should let a judge inspect every important claim without re
 | Two-device live auction recording | **PENDING PROOF** |
 | Soft-close recording | **PENDING PROOF** |
 | Bid-removal recording | **PENDING PROOF** |
-| Multi-account funded-wallet bid retest on real devices | **PENDING PROOF** |
+| Multi-account funded-wallet verification on real devices | **PENDING PROOF** |
 | One genuine verified mainnet NIM payment | **PENDING PROOF** |
-| User-testing evidence | **RECORDED** |
+| Real-user evidence | **RECORDED** |
 
 The strongest judge story is one full loop:
 
@@ -310,25 +310,25 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper protocol and A
 
 **LIVE** — A normal browser can browse and spectate. Hosting, authenticated bidding and wallet settlement are intentionally handled inside Nimiq Pay.
 
-## Tested with early users on Nimiq mainnet
+## Used by early users on Nimiq mainnet
 
-**RECORDED** — Early users have created auction rooms, entered rooms on mobile, connected Nimiq Pay, navigated the auction surfaces and exercised the mainnet flow. Some users successfully placed bids, while balance-backed bidder access is still being retested across Nimiq Pay account configurations.
+**RECORDED** — Early users have created auction rooms, joined auctions on mobile, connected Nimiq Pay, navigated the product and exercised the mainnet flow. Some users successfully placed bids, while balance-backed bidder access is still being verified across different Nimiq Pay account configurations.
 
-The anonymous labels below distinguish separate testing sessions. Names and handles are withheld from the public README.
+The labels below represent separate users and usage sessions. Names and handles are withheld from the public README.
 
 > “The UI is smooth, there’s a beginner guide, and it’s so easy to navigate.”  
-> — **User 1 · Mobile mainnet test**
+> — **User 1 · Mobile mainnet user**
 
 > “Bidding on an open auction item was seamless.”  
-> — **User 2 · Live auction test**
+> — **User 2 · Auction participant**
 
 > “Basically, your own mini auction house, powered by Nimiq.”  
-> — **User 3 · First-time Nimgavel test**
+> — **User 3 · First-time Nimgavel user**
 
 > “Overall user experience on mobile was okay. I didn’t need an explainer to understand.”  
-> — **User 4 · Mobile Nimiq Pay test**
+> — **User 4 · Mobile Nimiq Pay user**
 
-**RECORDED** — A separate tester rated their experience **95.9/100**, specifically praising the UI, brand consistency and working navigation. This is one tester's rating, not an aggregate product score.
+**RECORDED** — A separate user rated their experience **95.9/100**, specifically praising the UI, brand consistency and working navigation. This is one user's rating, not an aggregate product score.
 
 ## User feedback changed the product
 
@@ -336,8 +336,8 @@ The anonymous labels below distinguish separate testing sessions. Names and hand
 | --- | --- | --- |
 | Wallet connection could take too long or require a refresh | Added bounded provider/account states, late-provider recovery and a retry path | **LIVE** |
 | A funded mainnet wallet was incorrectly read as having 0 NIM | Corrected mainnet handling, hardened RPC parsing/retries, and moved bidder proof from a single assumed address to the bounded account set shared by Nimiq Pay | **LIVE / PENDING PROOF** |
-| One balance tester retested after an earlier fix | Tester confirmed the flow worked | **RECORDED** |
-| Another independent mobile tester could host successfully but was blocked from bidding by a `0 NIM` result | Multi-account bidder proof is deployed and CI is green; the affected real-device configurations still need current-build retesting | **PENDING PROOF** |
+| One affected user tried the flow again after an earlier fix | User confirmed the flow worked | **RECORDED** |
+| Another independent mobile user could host successfully but was blocked from bidding by a `0 NIM` result | Multi-account bidder proof is deployed and CI is green; the affected real-device configurations still need current-build verification | **PENDING PROOF** |
 | Mobile users said the core site was understandable without an explainer | Kept onboarding lightweight and preserved the direct create/bid/settle navigation model | **RECORDED** |
 | Winner cancellation could leave payment recovery in a confusing state | Normalized explicit cancellation and preserved safe unknown-payment recovery | **LIVE** |
 | Auction Floor / Results were slow on mobile | Removed embedded base64 photos from list responses and serve lot images separately through cacheable image endpoints | **LIVE** |
@@ -347,7 +347,7 @@ The anonymous labels below distinguish separate testing sessions. Names and hand
 | Buyers asked for Amazon-like delivery assurance | Clarified that Nimgavel verifies auction/payment evidence but does not currently guarantee real-world delivery | **LIVE** |
 | Buyers asked how to complain about late or missing delivery | Added the structured post-auction complaint/dispute workflow to the roadmap | **PLANNED** |
 
-**RECORDED** — Product changes above came from actual user testing rather than only scripted demos or local fixtures.
+**RECORDED** — Product changes above came from actual user feedback and live usage rather than only scripted demos or local fixtures.
 
 ## Current trust boundary
 
