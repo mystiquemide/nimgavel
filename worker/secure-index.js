@@ -145,7 +145,10 @@ async function fetchNimBalance(walletAddress, rpcUrl) {
 
 function rpcUrlForEnv(env) {
   if (env.NIMIQ_RPC_URL) return env.NIMIQ_RPC_URL;
-  return env.NIMIQ_NETWORK === "mainnet" ? MAINNET_RPC_URL : TESTNET_RPC_URL;
+  // Nimgavel is a mainnet product. Use mainnet unless a development/test
+  // environment explicitly opts into testnet. This prevents an unset
+  // NIMIQ_NETWORK binding from silently reporting funded mainnet wallets as 0.
+  return env.NIMIQ_NETWORK === "testnet" ? TESTNET_RPC_URL : MAINNET_RPC_URL;
 }
 
 function formatNim(lunas) {
