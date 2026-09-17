@@ -8,6 +8,7 @@ This roadmap describes proposed work, not shipped capabilities. Progress depends
 
 - Verify hosting, bidding, bid withdrawal, host moderation, settlement, and payment verification inside Nimiq Pay using multiple real devices.
 - Test balance-backed bidding with wallets that have enough NIM and wallets that do not.
+- Retest funded-wallet bidding across multiple real Nimiq Pay devices and account layouts, including a wallet where the funded account is not the first/shared-default account. Do not treat the balance gate as submission-ready until the users who reported false `0 NIM` can bid on the current build.
 - Complete at least one genuine auction from listing through verified payment.
 - Confirm that fulfillment terms are visible before bidding and again to the winner after the auction.
 - Confirm bidders cannot place a first bid until they explicitly acknowledge the published delivery / collection terms.
