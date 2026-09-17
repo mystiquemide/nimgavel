@@ -28,9 +28,11 @@ jobs:
         run: |
           # The worker returns 503 without an auth secret; CI generates one.
           # NIMIQ_RPC_URL points settlement tests at the in-suite mock RPC.
+          # Production is mainnet, but the deterministic settlement fixtures
+          # are testnet transactions, so CI overrides the network explicitly.
           # NIMGAVEL_TEST_MODE bypasses live balance enforcement only for the
           # existing synthetic lifecycle tests; it is never configured in prod.
-          node --input-type=module -e 'import { writeFileSync } from "node:fs"; import { randomBytes } from "node:crypto"; writeFileSync(".dev.vars", `NIMGAVEL_SECRET=${randomBytes(32).toString("hex")}\nNIMIQ_RPC_URL=http://127.0.0.1:8899\nNIMGAVEL_TEST_MODE=1\n`, { mode: 0o600 });'
+          node --input-type=module -e 'import { writeFileSync } from "node:fs"; import { randomBytes } from "node:crypto"; writeFileSync(".dev.vars", `NIMGAVEL_SECRET=${randomBytes(32).toString("hex")}\nNIMIQ_RPC_URL=http://127.0.0.1:8899\nNIMIQ_NETWORK=testnet\nNIMGAVEL_TEST_MODE=1\n`, { mode: 0o600 });'
           npx wrangler d1 migrations apply nimgavel --local
           nohup npx wrangler dev --local --port 8799 --test-scheduled > /tmp/wrangler.log 2>&1 &
           for i in $(seq 1 60); do
