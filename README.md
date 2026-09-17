@@ -59,289 +59,253 @@
 
 ---
 
-## Live auctions, directly inside the wallet
+## Community auctions are easy to start but difficult to run fairly
 
-Nimgavel is a live community auction house built inside **Nimiq Pay**.
+**LIVE** — Nimgavel is a live community auction house built inside **Nimiq Pay**.
 
-Hosts can list an item, open a live auction room and receive bids in real time. Bidders join with a pseudonymous paddle, compete without paying for every bid, and the winner settles directly with the host in **NIM**.
+Chat auctions are simple until several people start bidding at once. Then bid ordering becomes unclear, closing times can be disputed, last-second sniping becomes frustrating, withdrawn bids can destroy the audit trail, and payment proof becomes difficult to verify.
 
-**No marketplace account. No platform custody. No platform transaction fee.**
-
-Nimiq Pay handles the wallet, signatures and payment. Nimgavel handles the auction.
-
-## Why Nimgavel exists
-
-Running a small community auction online is still awkward.
-
-Traditional platforms introduce accounts, marketplace fees, payment processors and custody. Chat-based auctions are easier to start, but bids become hard to order, closing times can be disputed, and payment proof is difficult to verify.
-
-Nimgavel turns the full process into one clear loop:
+Nimgavel gives the auction one authoritative live room and one complete loop:
 
 ```text
-list → bid → close → pay → verify
+create → bid → soft close → sell → pay → verify
 ```
 
-The goal is to make the blockchain useful without making users think about blockchain mechanics at every step.
+**LIVE** — No marketplace account. No platform custody. No platform transaction fee.
 
-## Who it is for
+**LIVE** — Nimiq Pay handles wallet identity, signatures and the winner payment. Nimgavel handles the auction engine and verifies the resulting NIM settlement against Nimiq mainnet.
 
-Nimgavel is designed for communities, creators, collectors and event organizers that want to run lightweight live auctions without building or joining a full marketplace.
+## Status legend
 
-Potential uses include:
+Every product claim in this README is marked with one of these states.
 
-- community merchandise auctions
-- creator drops
-- digital and physical collectibles
-- charity and fundraising auctions
-- limited-edition community items
-- private community events
-- recurring club or organizer auctions
+| Label | Meaning |
+| --- | --- |
+| **LIVE** | Running in the deployed Nimgavel product |
+| **TESTED** | Covered by automated or real-device testing |
+| **RECORDED** | Captured as user or judge evidence |
+| **PLANNED** | Explicitly on the product roadmap |
+| **PENDING PROOF** | Built or tested, but final submission evidence still needs packaging |
 
-## How an auction works
+## Try Nimgavel
 
-### 1. Host a lot
+**LIVE** — Production: https://nimgavel.artistic-chip.workers.dev
 
-Open Nimgavel inside Nimiq Pay and create an auction with an item title, description, photograph, starting price, minimum increment, duration and fulfillment terms.
+**LIVE** — Network: Nimiq mainnet.
 
-The host signs a one-time wallet challenge. There is no separate Nimgavel account or password.
+**LIVE** — Settlement asset: native NIM.
 
-### 2. Join with a paddle
+**LIVE** — Built for the Nimiq Pay Mini Apps Competition, Cycle II.
 
-Participants receive a pseudonymous, device-scoped paddle identity such as:
+**PENDING PROOF** — The repository is currently private. Judge repository access must be granted as part of the final submission package.
+
+## One complete auction loop
+
+### 1. Create
+
+**LIVE** — A host creates a lot with an item title, photograph, description, starting bid, minimum increment, duration and fulfillment terms.
+
+**LIVE** — Hosts are prompted to publish the delivery or collection method, location/service-area context, expected timeframe, shipping responsibility or cost, and handoff details without exposing a private home address.
+
+**LIVE** — Auction creation requires a Nimiq Pay wallet signature. There is no separate Nimgavel username or password.
+
+### 2. Bid
+
+**LIVE** — Bidders enter through Nimiq Pay and receive a pseudonymous paddle identity such as:
 
 ```text
 Paddle #42 · Quiet Heron
 ```
 
-This keeps the auction interface simple while avoiding another signup flow.
+**LIVE** — Paddle identity uses the Nimiq Pay Mini App device identifier flow rather than a separate marketplace account.
 
-### 3. Bid in real time
+**LIVE** — Before the first bid, the bidder must acknowledge the host's published fulfillment terms.
 
-Auction rooms update live over WebSockets. Every valid bid is ordered by the authoritative room state and broadcast to connected participants.
+**LIVE** — The first bid requires a wallet authorization signature. Nimgavel derives the balance-checked Nimiq address from the actual signing public key instead of assuming the first account returned by the wallet is the intended bidder account.
 
-Bidding itself does not send an on-chain transaction, so users can raise their paddle without paying a network fee for each bid.
+**LIVE** — Nimgavel checks the wallet's live NIM balance before the bid enters the auction engine. Funds remain in the bidder's wallet until settlement.
 
-On a bidder's first bid in a room, Nimgavel asks for a one-time wallet authorization and checks that the wallet has enough NIM to support the bid. Funds stay in the bidder's wallet until settlement.
+**RECORDED** — A mainnet tester who previously hit a false balance failure retested after the signing-wallet fix and confirmed: “have checked it, it worked.”
 
-### 4. Soft close prevents sniping
+### 3. Soft close
 
-A valid bid during the final 30 seconds resets the remaining time to 30 seconds.
+**LIVE** — A valid bid during the final 30 seconds resets the remaining time to 30 seconds.
 
-The auction closes only when bidding actually stops, giving other participants a fair chance to respond.
+**LIVE** — The server owns the authoritative deadline, so a stale client cannot force a late bid through after the room has closed.
 
-### 5. Winner pays the host directly
+**TESTED** — Soft-close behavior is covered by the auction-room test suite.
 
-When the gavel falls, only the winning paddle receives the payment action.
+**PENDING PROOF** — Add a clean two-device soft-close recording to the final judge bundle.
 
-Nimiq Pay sends the exact winning amount directly from the winner's wallet to the host's wallet. Nimgavel never receives or holds the funds.
+### 4. Sell
 
-### 6. Nimgavel verifies settlement
+**LIVE** — When the timer expires, the highest valid bid wins and the winning bid becomes locked.
 
-A transaction hash alone is not treated as proof of payment.
+**LIVE** — A lot with no qualifying bids automatically becomes `passed`. The host does not need to manually expire it.
 
-Nimgavel checks the transaction against the auction, including:
+**LIVE** — Bidders can withdraw eligible bids, hosts can remove bids only with a public reason, and removed bids remain visible in public history.
 
-- transaction hash
-- Nimiq network
-- recipient
-- exact amount
-- auction reference
-- successful execution
-- required confirmations
+**TESTED** — Bid withdrawal/removal behavior and winner locking are covered by automated tests.
 
-Receipts move through explicit states such as `pending`, `verified` or `rejected`, and pending payments are rechecked automatically.
+**PENDING PROOF** — Add a clean bid-removal recording to the final judge bundle.
 
-### 7. Host fulfills the lot
+### 5. Pay
 
-Before bidding begins, the host publishes how the winner will receive the item: shipping, local pickup, digital delivery or another clearly stated method.
+**LIVE** — Only the winning bidder receives the settlement action.
 
-After verified payment, fulfillment happens directly between the host and winner under those published terms.
+**LIVE** — Nimiq Pay sends the exact winning amount directly from the winner's wallet to the host's wallet. Nimgavel never receives or holds the funds.
 
-## Product surfaces
+**LIVE** — The payment includes an auction-specific `Nimgavel:<lotId>` reference.
 
-| Surface | What it does |
-| --- | --- |
-| **Home** | Introduces Nimgavel and directs users into the auction experience |
-| **Auction Floor** | Browse live, upcoming and completed auction lots |
-| **Auction Room** | Follow the timer, current leader, bid history and room state in real time |
-| **Host** | Create, share and control an auction |
-| **Results Ledger** | Review completed auctions and settlement status |
-| **Leaderboard** | See auction activity and winning history |
-| **How It Works** | Understand the auction lifecycle in plain language |
-| **Privacy & Terms** | Read the product's trust boundaries and user responsibilities |
+**LIVE** — Explicit wallet cancellation safely returns the winner to the payment flow, while uncertain outcomes stay in recovery mode to reduce double-payment risk.
 
-A normal browser can be used to browse and spectate. Hosting, authenticated bidding and wallet settlement are intentionally handled inside Nimiq Pay.
+### 6. Verify
 
-## What Nimgavel contains
+**LIVE** — A transaction hash alone is not accepted as proof.
 
-The current product includes:
+Nimgavel checks the submitted settlement against the auction, including:
 
-- wallet-signed auction creation
-- image-backed auction lots
-- explicit fulfillment and delivery terms
-- device-scoped bidder paddles
-- one-time wallet authorization for bidding
-- live NIM balance checks before bids are accepted
-- real-time WebSocket auction rooms
-- server-authoritative bid ordering
-- configurable starting prices and increments
-- soft-close anti-sniping rules
-- bidder withdrawal for mistaken bids
-- host moderation with required public reasons
-- visible bid-removal history
-- direct winner-to-host NIM settlement
-- transaction-reference binding
-- on-chain payment verification
-- automatic settlement rechecks
-- public auction results
-- leaderboard and auction history
-- QR and share flows
-- browser spectator mode
-- Nimiq Pay wallet, loading, cancellation and recovery states
-- automated functional and security regression tests
+- **LIVE** — Nimiq network
+- **LIVE** — recipient
+- **LIVE** — exact amount
+- **LIVE** — auction reference
+- **LIVE** — successful execution
+- **LIVE** — required confirmation state
 
-## Why Nimiq Pay is core
+**LIVE** — Settlement moves through explicit `pending`, `verified` or `rejected` states, and pending evidence is rechecked automatically.
 
-Nimiq integration is part of the product lifecycle, not an optional checkout button at the end.
+**PENDING PROOF** — One genuine verified mainnet NIM settlement should be the centerpiece of the final judge evidence bundle.
 
-Nimgavel uses `@nimiq/mini-app-sdk` for wallet-aware Mini App functionality including wallet accounts, message signing, device-scoped paddles and NIM transfers. `@nimiq/core` is used to parse wallet transaction results.
+## Nimiq Pay is load-bearing
 
-The host's wallet signature authorizes auction creation and control. A bidder's first bid is authorized by their wallet. The winner's native NIM payment settles the auction. Nimiq Pay owns private-key handling and transaction approval throughout the flow.
+Nimiq Pay is not a checkout button attached to the end of Nimgavel. It is required throughout the auction lifecycle.
 
-Nimgavel never receives the user's private key.
+| Scene | Nimiq role | Status |
+| --- | --- | --- |
+| Host signature | Nimiq Pay signs the host authorization used to create/control the lot | **LIVE** |
+| Paddle identity | Nimiq Pay's Mini App device identifier produces the device-scoped identity used to issue a pseudonymous paddle | **LIVE** |
+| Bidder access | Nimiq Pay signs the first-bid authorization; Nimgavel derives the signer address and performs the balance gate | **LIVE** |
+| Winner payment | Nimiq Pay signs and sends the native NIM payment directly to the host with the auction reference | **LIVE** |
+| Settlement verification | The Nimiq Pay payment creates the referenced transaction; Nimgavel then verifies it against Nimiq mainnet via JSON-RPC | **LIVE** |
+
+**LIVE** — Nimgavel never receives the user's private key.
 
 ## Fair auction mechanics
 
-Live auctions need stronger rules than a normal payment page.
-
 ### Ordered bidding
 
-Each auction has one authoritative live room responsible for the current leader, amount, deadline and bid order.
+**LIVE** — Each auction has one authoritative live room responsible for the current leader, amount, deadline and bid order.
 
 ### Balance-backed bidding
 
-A bidder cannot raise the auction price with a wallet that lacks enough NIM for the proposed bid. Nimgavel checks the live wallet balance before the bid enters the auction engine.
+**LIVE** — A bidder cannot raise the auction price with a wallet that lacks enough NIM for the proposed bid at that moment.
 
-The balance is not locked. This prevents zero-balance price inflation but does not guarantee that funds remain in the wallet until settlement.
+**LIVE** — The balance is not locked. The check prevents zero-balance price inflation but does not guarantee that funds remain available until settlement.
 
 ### Minimum increments
 
-A bid must beat the current amount by at least the host's configured minimum increment.
+**LIVE** — Every bid must satisfy the host's configured minimum increment.
 
 ### Server-authoritative deadlines
 
-The server decides whether the room is still open. A stale client or delayed timer cannot submit a valid bid after the authoritative deadline.
+**LIVE** — The server decides whether bidding is still open.
 
 ### Transparent removals
 
-Bidders can withdraw their own bids. Hosts can remove bids only with a public reason, and removed bids remain in the room's removal history instead of silently disappearing.
+**LIVE** — Withdrawn and host-removed bids remain in history rather than disappearing silently.
 
-If a live leader is removed, the room recalculates the highest valid bid and guarantees bidders enough time to respond.
+**LIVE** — If the current leader is removed, the room recalculates the valid leader and preserves response time for remaining bidders.
 
 ### Locked winner
 
-Once the auction closes, the winning bid is locked and cannot be removed.
+**LIVE** — The winning bid cannot be withdrawn after the gavel falls.
+
+## Judge-ready proof bundle
+
+The final submission should let a judge inspect every important claim without reading the entire codebase.
+
+| Evidence | Status |
+| --- | --- |
+| Live production URL | **LIVE** |
+| Private repository + judge access | **PENDING PROOF** |
+| Architecture diagram and architecture document | **LIVE** |
+| Automated test suite | **TESTED** |
+| CI workflow on `main` | **TESTED** |
+| Two-device live auction recording | **PENDING PROOF** |
+| Soft-close recording | **PENDING PROOF** |
+| Bid-removal recording | **PENDING PROOF** |
+| One genuine verified mainnet NIM payment | **PENDING PROOF** |
+| User-testing evidence | **RECORDED** |
+
+The strongest judge story is one full loop:
+
+```text
+host signs
+   ↓
+bidder gets a paddle
+   ↓
+bidder authorizes the signing wallet
+   ↓
+live bidding
+   ↓
+soft close
+   ↓
+winner selected
+   ↓
+winner pays in Nimiq Pay
+   ↓
+Nimgavel verifies settlement
+```
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    A["Browser / Nimiq Pay"] --> B["Vite Mini App"]
+    A["Nimiq Pay / Browser"] --> B["Nimgavel Mini App"]
     B --> C["Cloudflare Worker API"]
     B <-->|"Live WebSocket"| D["Auction Durable Object"]
     C --> E["Cloudflare D1"]
     D --> E
     C --> F["Nimiq JSON-RPC"]
-    G["Nimiq Pay Wallet"] -->|"Message signing"| B
-    G -->|"Winner sends NIM"| H["Nimiq Blockchain"]
-    F -->|"Verify settlement"| H
+    G["Nimiq Pay"] -->|"Device identifier + signatures"| B
+    G -->|"Winner sends referenced NIM"| H["Nimiq Blockchain"]
+    F -->|"Balance + settlement verification"| H
 ```
 
-### Frontend
+**LIVE** — Frontend: Vanilla JavaScript + Vite.
 
-Vanilla JavaScript with Vite powers the auction floor, rooms, hosting flow, results, leaderboard, spectator states and wallet recovery UI.
+**LIVE** — API/runtime: Cloudflare Workers.
 
-### API
+**LIVE** — Real-time auction engine: Cloudflare Durable Objects + WebSockets.
 
-A Cloudflare Worker handles REST validation, authorization, lot management and settlement verification.
+**LIVE** — Persistence: Cloudflare D1.
 
-### Live auction engine
+**LIVE** — Wallet integration: `@nimiq/mini-app-sdk`.
 
-Each auction uses its own Cloudflare Durable Object for ordered bids, WebSockets, persistent room state and close alarms.
+**LIVE** — Transaction parsing: `@nimiq/core`.
 
-### Persistence
+**LIVE** — No custom smart contract and no Nimgavel custodial payment wallet.
 
-Cloudflare D1 stores lots, paddles, bid history, challenges, removal history and receipt verification state.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper protocol and API model.
 
-### Nimiq
+## Product surfaces
 
-Nimiq Pay handles signing and native NIM payment. A configured Nimiq JSON-RPC provider is used to verify balances and settlement evidence.
+| Surface | What it does | Status |
+| --- | --- | --- |
+| Home | Introduces Nimgavel and directs users into the auction flow | **LIVE** |
+| Auction Floor | Browse live, upcoming and completed lots | **LIVE** |
+| Auction Room | Timer, leader, bids, removals, fulfillment and settlement | **LIVE** |
+| Host | Create and control an auction | **LIVE** |
+| Results Ledger | Completed auctions and settlement state | **LIVE** |
+| Leaderboard | Auction activity and winning history | **LIVE** |
+| How It Works | Auction lifecycle and trust boundaries | **LIVE** |
+| Privacy & Terms | Product responsibilities and limitations | **LIVE** |
 
-Nimgavel uses no custom smart contracts and operates no custodial payment wallet.
+**LIVE** — A normal browser can browse and spectate. Hosting, authenticated bidding and wallet settlement are intentionally handled inside Nimiq Pay.
 
-For the deeper protocol and API model, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+## Tested with early users on Nimiq mainnet
 
-## Reliability and failure handling
-
-A live auction cannot assume every network request succeeds on the first attempt.
-
-Nimgavel explicitly handles cases including:
-
-- late Nimiq Pay provider injection
-- wallet connection, approval and cancellation states
-- reconnecting auction-room clients
-- expired authorization
-- invalid bid increments
-- insufficient bidder balance
-- bids arriving after close
-- delayed close alarms
-- database write failures
-- cancelled or uncertain winner payments
-- invalid or incomplete payment evidence
-- unavailable RPC responses
-- rejected settlement verification
-- retrying pending payment checks
-
-Auction finalization is written idempotently, and settlement verification stays separate from merely recording a transaction hash.
-
-## Testing and CI
-
-The GitHub Actions workflow builds the frontend, starts a local Worker, applies D1 migrations, runs the full test suite, performs a Worker deploy dry-run, runs the dependency audit and checks the production bundle for dev-only leakage.
-
-Run the same core checks locally with:
-
-```sh
-npm test
-npm run build:web
-npm run worker:check
-npm audit
-```
-
-Tests cover signed hosting, authenticated bidding, minimum increments, soft closes, settlement checks, transaction parsing and failure recovery.
-
-[`test/security-regressions.test.js`](test/security-regressions.test.js) also covers authorization bypasses, expired auctions, D1 outages and invalid payment evidence.
-
-RPC fixtures used by the local tests simulate blockchain responses. They are testing tools, not real payment evidence.
-
-## What we built for the Nimiq Mini Apps Competition
-
-Nimgavel started with a simple question:
-
-> Can Nimiq Pay power a real-time economic experience instead of only a one-time payment screen?
-
-For this competition, we built the complete auction loop from listing through bidding and final settlement verification.
-
-The goal was not to create a mock auction interface. We wanted every important transition to exist as part of one working product:
-
-```text
-create → authorize → bid → close → settle → verify → fulfill
-```
-
-This turns NIM into the settlement layer for a live social-commerce experience inside Nimiq Pay.
-
-## Used by early users on Nimiq mainnet
-
-Nimgavel is already being used by early community members on Nimiq mainnet to create auction rooms, place live bids, navigate Nimiq Pay onboarding and run through the auction flow on mobile.
+**RECORDED** — Early users have created auction rooms, entered rooms on mobile, connected Nimiq Pay, placed bids, navigated the auction surfaces and exercised the mainnet flow.
 
 > “The UI is smooth, there’s a beginner guide, and it’s so easy to navigate.”  
 > — Early mobile user
@@ -352,159 +316,123 @@ Nimgavel is already being used by early community members on Nimiq mainnet to cr
 > “Basically, your own mini auction house, powered by Nimiq.”  
 > — First-time Nimgavel user
 
-### Shaped by live user feedback
+**RECORDED** — One tester rated their experience **95.9/100**, specifically praising the UI, brand consistency and working navigation. This is one tester's rating, not an aggregate product score.
 
-Early mainnet usage directly led to improvements including:
+## User feedback changed the product
 
-- more resilient Nimiq Pay connection and late-provider recovery
-- balance-backed bidding
-- clearer auction states and host controls
-- fulfillment terms shown before bidding
-- winner payment retry handling after cancellation
-- desktop QR handoff
-- mobile photo handling
-- clearer beginner onboarding
+| User feedback | What changed | Status |
+| --- | --- | --- |
+| Wallet connection could take too long or require a refresh | Added bounded provider/account states, late-provider recovery and a retry path | **LIVE** |
+| A funded mainnet wallet was incorrectly read as having 0 NIM | Corrected network handling, then bound the balance check to the actual signing key instead of assuming the first wallet account | **LIVE / RECORDED** |
+| The same balance tester retested after the fix | Tester confirmed the flow worked | **RECORDED** |
+| Winner cancellation could leave payment recovery in a confusing state | Normalized explicit cancellation and preserved safe unknown-payment recovery | **LIVE** |
+| Auction Floor / Results were slow on mobile | Removed embedded base64 photos from list responses and serve lot images separately through cacheable image endpoints | **LIVE** |
+| Recent hammer results moved while someone was still reading them | Reduced disruptive refresh behavior and only rebuild the section when the result data actually changes | **LIVE** |
+| Users asked what happens when nobody bids | Clarified that the auction closes automatically as `passed` | **LIVE** |
+| Buyers wanted delivery/collection expectations before bidding | Hosts publish fulfillment terms and bidders must acknowledge them before the first bid | **LIVE** |
+| Buyers asked for Amazon-like delivery assurance | Clarified that Nimgavel verifies auction/payment evidence but does not currently guarantee real-world delivery | **LIVE** |
+| Buyers asked how to complain about late or missing delivery | Added the structured post-auction complaint/dispute workflow to the roadmap | **PLANNED** |
 
-The product is being refined from real usage rather than only local fixtures or scripted demos.
+**RECORDED** — Product changes above came from actual user testing rather than only scripted demos or local fixtures.
 
-## Why people would come back
+## Current trust boundary
 
-Auctions create a natural repeat loop.
+Nimgavel can prove substantially more about the auction and NIM payment than it can currently prove about physical-world delivery.
 
-A creator can launch another item. A community can run another drop. An organizer can host another event. Bidders can return for new lots, inspect previous results and build an auction history.
+### What Nimgavel currently establishes
 
-```text
-new lot
-  ↓
-community joins
-  ↓
-live bidding
-  ↓
-settlement
-  ↓
-public result
-  ↓
-next auction
-```
+- **LIVE** — authoritative auction state
+- **LIVE** — bid and removal history
+- **LIVE** — winning paddle
+- **LIVE** — published fulfillment terms
+- **LIVE** — bidder acknowledgement of those terms
+- **LIVE** — balance availability at bid time
+- **LIVE** — matching NIM settlement evidence
 
-The longer-term opportunity is to make Nimgavel a reusable auction primitive for Nimiq communities and organizers.
+### What Nimgavel does not currently guarantee
+
+- **LIVE** — Nimgavel does not custody buyer or seller funds
+- **LIVE** — Nimgavel does not lock bidder funds between bidding and settlement
+- **LIVE** — Nimgavel does not guarantee physical delivery
+- **LIVE** — Nimgavel does not authenticate physical items
+- **LIVE** — Nimgavel does not provide escrow
+- **LIVE** — Nimgavel does not currently arbitrate delivery disputes
+- **LIVE** — Nimgavel does not guarantee the real-world identity of a bidder or seller
+
+A verified NIM payment proves that the matching payment occurred under the configured RPC trust assumption. It does not prove that a seller later delivered an item or that a physical item is authentic.
 
 ## Roadmap
 
-Nimgavel's next stage is focused on making repeat auctions dependable before expanding into a broader marketplace.
+The next product work focuses on making repeat auctions dependable and strengthening the settlement-to-delivery lifecycle.
 
 ### Near term
 
-- wallet-signed host-control recovery
-- cancellation for auctions that have not started
-- stronger native-device coverage
-- clearer bidder identity boundaries
-- improved monitoring and operational resilience
-- explicit unpaid-winner handling and settlement windows
+- **PLANNED** — wallet-signed host-control recovery
+- **PLANNED** — cancellation for auctions that have not started
+- **PLANNED** — explicit unpaid-winner state and settlement window
+- **PLANNED** — stronger native-device coverage and monitoring
 
-### Community organizer tools
+### Fulfillment and complaints
 
-Once repeat organizers demonstrate demand:
+- **PLANNED** — private host/winner coordination after verified settlement
+- **PLANNED** — immutable snapshot of the exact fulfillment terms accepted by the winner
+- **PLANNED** — awaiting fulfillment / shipped / ready for pickup / delivered states
+- **PLANNED** — optional tracking references
+- **PLANNED** — winner delivery confirmation
+- **PLANNED** — complaints for late, missing, wrong or damaged delivery
+- **PLANNED** — host responses and immutable complaint history
+- **PLANNED** — opened / responded / resolved / unresolved complaint states
+- **PLANNED** — privacy-safe evidence and downloadable records
 
-- organizer pages
-- multi-lot auction events
-- upcoming auction schedules
-- opt-in reminders
-- settlement and receipt exports
+### Stronger settlement protection
 
-### Trust and marketplace tooling
+- **PLANNED** — evaluate refundable bid bonds
+- **PLANNED** — evaluate stronger wallet payment commitments
+- **PLANNED** — evaluate escrow or HTLC-style settlement only after dedicated protocol, failure-state and security review
 
-Future work can include:
+See [`ROADMAP.md`](ROADMAP.md) for the full roadmap and scope boundaries.
 
-- stronger listing provenance
-- private host/winner contact exchange
-- delivery confirmation and tracking references
-- reporting and dispute tools
-- reputation based on meaningful completed activity
-- stronger bidder commitment mechanisms such as bid bonds after dedicated security review
+## Testing and CI
 
-Wallet ownership and seller reputation will remain separate concepts.
+**TESTED** — GitHub Actions builds the frontend, starts a local Worker, applies D1 migrations, runs the automated suite, performs a Worker deploy dry-run, runs the dependency audit and checks the production bundle for dev-only leakage.
 
-### Sustainable business model
+Core automated coverage includes:
 
-Basic community auctions should remain easy to access.
+- **TESTED** — signed hosting
+- **TESTED** — authenticated bidding
+- **TESTED** — minimum increments
+- **TESTED** — soft close
+- **TESTED** — bid removal and withdrawal
+- **TESTED** — settlement verification
+- **TESTED** — transaction parsing
+- **TESTED** — expired auction and authorization failures
+- **TESTED** — database failure handling
+- **TESTED** — invalid payment evidence
 
-Potential paid organizer features include branded auction events, team controls, reporting and advanced event management. Transaction fees, escrow or delivery-linked settlement would only be considered after real user demand, legal review and dedicated security work.
+**TESTED** — RPC fixtures used locally simulate blockchain responses. They are test tools, not real payment evidence.
 
-See [`ROADMAP.md`](ROADMAP.md) for the full product roadmap.
-
-## Trust model and current limitations
-
-Nimgavel deliberately keeps the financial model simple.
-
-### Nimgavel does
-
-- run the live auction
-- maintain authoritative bid state
-- verify that a bidder has enough NIM at bid time
-- determine the winning paddle
-- request the correct NIM payment
-- verify settlement evidence
-- publish auction results
-- show the host's fulfillment terms before bidding
-
-### Nimgavel does not
-
-- custody buyer or seller funds
-- lock bidder funds between bid and settlement
-- guarantee delivery
-- authenticate physical items
-- provide escrow
-- guarantee the real-world identity of a bidder
-- hold private keys
-
-Additional current boundaries:
-
-- paddles remain pseudonymous device identities; first-bid wallet authorization binds the bidding session to a wallet for that auction
-- a successful balance check proves funds were available at bid time, not that they remain available later
-- delivery is arranged directly between host and winner under the published fulfillment terms
-- host-control tokens currently expire after 24 hours and do not yet have a recovery flow
-- payment verification trusts the configured RPC provider
-- public lists are intentionally bounded rather than unbounded feeds
-- local demo fixtures are synthetic and never count as evidence of real usage
-
-Payment verification proves that a matching NIM transaction occurred under the configured RPC trust assumption. It does not prove that a seller delivered an item or that a physical item is authentic.
-
-## Run locally
-
-Requirements:
-
-- Node.js 22.20+
-- Cloudflare Wrangler
-- a private `NIMGAVEL_SECRET` of at least 32 characters
-
-Create `.dev.vars`:
-
-```env
-NIMGAVEL_SECRET=replace-with-a-random-secret
-NIMIQ_RPC_URL=http://127.0.0.1:8899
-```
-
-Install and start:
+Run the same core checks locally with:
 
 ```sh
-npm ci
+npm test
 npm run build:web
-npm run db:migrate:local
-npm run dev:worker -- --local --test-scheduled
+npm run worker:check
+npm audit
 ```
 
-Open `http://localhost:8799`.
+## Competition
 
-For frontend hot reload, run:
+**LIVE** — Nimgavel is built for the **Nimiq Pay Mini Apps Competition, Cycle II**.
 
-```sh
-npm run dev:web
-```
+The core competition question is simple:
 
-The Vite development server proxies API and WebSocket traffic to the local Worker.
+> Can Nimiq Pay power a fair live auction from creation all the way to verified payment?
 
-## Tech stack
+Nimgavel's answer is the working loop above, with Nimiq Pay carrying identity, authorization and payment rather than appearing only at checkout.
+
+## Developer appendix
+
+### Tech stack
 
 | Layer | Technology |
 | --- | --- |
@@ -519,24 +447,45 @@ The Vite development server proxies API and WebSocket traffic to the local Worke
 | Testing | Node.js test runner + GitHub Actions |
 | License | MIT |
 
-## Documentation
+### Run locally
+
+Requirements:
+
+- Node.js 22.20+
+- Cloudflare Wrangler
+- a private `NIMGAVEL_SECRET` of at least 32 characters
+
+Create `.dev.vars`:
+
+```env
+NIMGAVEL_SECRET=replace-with-a-random-secret
+NIMIQ_RPC_URL=http://127.0.0.1:8899
+NIMIQ_NETWORK=testnet
+```
+
+Install and start:
+
+```sh
+npm ci
+npm run build:web
+npm run db:migrate:local
+npm run dev:worker -- --local --test-scheduled
+```
+
+Open `http://localhost:8799`.
+
+For frontend hot reload:
+
+```sh
+npm run dev:web
+```
+
+### Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture, auction state, API, WebSockets and payment verification
+- [`ROADMAP.md`](ROADMAP.md) — planned product development and trust work
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — deployment and environment setup
-- [`ROADMAP.md`](ROADMAP.md) — planned product development
 - [`docs/CREDITS.md`](docs/CREDITS.md) — third-party visual credits
-
-## Competition
-
-Nimgavel is built for the **Nimiq Pay Mini Apps Competition, Cycle II**.
-
-The project is open source under the MIT License and built around the Nimiq Pay Mini Apps Framework.
-
-Our contribution to the ecosystem is simple:
-
-> **Make NIM useful inside a live social-commerce experience.**
-
-Instead of leaving the wallet to visit an auction platform, the auction comes to the wallet.
 
 ## Links
 
