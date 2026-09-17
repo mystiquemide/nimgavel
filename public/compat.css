@@ -61,6 +61,38 @@
   color: var(--ink-muted);
 }
 
+/* Hosts do not accept bids manually. Make that unmistakable in the room. */
+.host-bid-guidance {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--green-bold);
+  border-radius: 10px;
+  background: var(--tint-mint);
+  color: var(--ink);
+}
+
+.host-bid-guidance strong {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.host-bid-guidance-copy {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.host-sticky-status {
+  cursor: default;
+  pointer-events: none;
+  background: var(--gold-wheat) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--gold-primary);
+}
+
 /* iOS/WebView touch hardening for the photo controls. */
 .photo-selected-row {
   position: relative;
