@@ -13,8 +13,8 @@ export function renderLanding(container) {
       <div class="hero-center-container">
         <!-- Hero Copy & Actions Centered -->
         <div class="hero-center-content" data-animate="fade-up">
-          <p class="hero-kicker" aria-label="Auction chant">
-            going once , going twice . <span class="kicker-sold">SOLD</span> . NIM
+          <p class="hero-kicker" aria-label="Auction chant" style="font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.01em; transform: none;">
+            Going once. Going twice. <span class="kicker-sold" style="font-family: inherit; font-size: inherit; font-weight: 800; letter-spacing: inherit; padding: 0;">SOLD</span>. NIM.
           </p>
           <h1 id="hero-heading" class="hero-title">
             The live community auction house for Nimiq.
