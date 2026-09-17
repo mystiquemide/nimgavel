@@ -3,10 +3,16 @@
 // before a bid is allowed to reach the room logic.
 
 import worker, { AuctionRoom as BaseAuctionRoom } from "./index.js";
-import { normalizeNimiqAddress, verifyNimiqSignedMessage } from "./auth.js";
+import {
+  normalizeNimiqAddress,
+  publicKeyToNimiqAddress,
+  verifyNimiqSignedMessage
+} from "./auth.js";
 import {
   BIDDER_PROOF_TTL_MS,
-  bidderAuthorizationMessage
+  BIDDER_PROOF_VERSION,
+  bidderAuthorizationMessage,
+  bidderAuthorizationMessageV2
 } from "../lib/bidder-proof.js";
 
 const MAINNET_RPC_URL = "https://rpc.nimiqwatch.com";
@@ -105,7 +111,7 @@ export class AuctionRoom extends BaseAuctionRoom {
       if (balanceLunas < message.amountLunas) {
         throw new BidGuardError(
           "insufficient_balance",
-          `You need at least ${formatNim(message.amountLunas)} NIM in this wallet to place this bid. Your current balance is ${formatNim(balanceLunas)} NIM.`
+          `Nimgavel checked ${shortWalletAddress(walletAddress)} and found ${formatNim(balanceLunas)} NIM spendable on-chain. This bid needs at least ${formatNim(message.amountLunas)} NIM.`
         );
       }
     } catch (error) {
@@ -130,23 +136,41 @@ export class AuctionRoom extends BaseAuctionRoom {
       throw new BidGuardError("bidder_auth_required", "Confirm your bidder wallet in Nimiq Pay before placing your first bid.");
     }
 
-    const walletAddress = normalizeNimiqAddress(proof.walletAddress);
     const expiresAt = Number(proof.expiresAt);
-    if (!walletAddress || proof.paddle !== session.paddle || !Number.isSafeInteger(expiresAt)) {
+    if (proof.paddle !== session.paddle || !Number.isSafeInteger(expiresAt)) {
       throw new BidGuardError("bidder_auth_required", "Bidder wallet authorization is invalid. Try the bid again.");
     }
     if (expiresAt <= now || expiresAt > now + BIDDER_PROOF_TTL_MS + PROOF_CLOCK_SKEW_MS) {
       throw new BidGuardError("bidder_auth_required", "Bidder wallet authorization expired. Confirm your wallet again.");
     }
 
+    let walletAddress;
     let expectedMessage;
     try {
-      expectedMessage = bidderAuthorizationMessage({
-        lotId: this.lot.id,
-        paddle: session.paddle,
-        walletAddress,
-        expiresAt
-      });
+      if (Number(proof.version) === BIDDER_PROOF_VERSION) {
+        // V2 trusts the cryptographic signer, not listAccounts()[0]. Nimiq Pay
+        // can expose multiple addresses, so derive the exact checked address
+        // from the public key that approved this bid authorization.
+        walletAddress = walletAddressFromPublicKey(proof.publicKey);
+        if (!walletAddress) throw new Error("invalid signer");
+        expectedMessage = bidderAuthorizationMessageV2({
+          lotId: this.lot.id,
+          paddle: session.paddle,
+          expiresAt
+        });
+      } else if (proof.version === undefined || proof.version === null || Number(proof.version) === 1) {
+        // Rolling-deploy compatibility for tabs that still have the v1 client.
+        walletAddress = normalizeNimiqAddress(proof.walletAddress);
+        if (!walletAddress) throw new Error("invalid wallet");
+        expectedMessage = bidderAuthorizationMessage({
+          lotId: this.lot.id,
+          paddle: session.paddle,
+          walletAddress,
+          expiresAt
+        });
+      } else {
+        throw new Error("unsupported proof version");
+      }
     } catch {
       throw new BidGuardError("bidder_auth_required", "Bidder wallet authorization is invalid. Try the bid again.");
     }
@@ -318,9 +342,31 @@ async function fetchNimBalance(walletAddress, rpcUrl) {
   catch { throw new Error("rpc unavailable"); }
 
   if (payload?.error) throw new Error("rpc rejected account lookup");
-  const balance = Number(payload?.result?.data?.balance);
+  // Nimiq RPC clients have exposed both a direct account result and a
+  // { data: account } envelope over time. Accept both without turning a valid
+  // funded account into a false zero/unavailable result.
+  const rawBalance = payload?.result?.balance ?? payload?.result?.data?.balance;
+  const balance = Number(rawBalance);
   if (!Number.isSafeInteger(balance) || balance < 0) throw new Error("invalid balance response");
   return balance;
+}
+
+function walletAddressFromPublicKey(publicKey) {
+  if (typeof publicKey !== "string" || !/^[a-fA-F0-9]{64}$/.test(publicKey)) return null;
+  try {
+    const pairs = publicKey.match(/.{2}/g);
+    if (!pairs || pairs.length !== 32) return null;
+    const bytes = Uint8Array.from(pairs, (byte) => Number.parseInt(byte, 16));
+    return publicKeyToNimiqAddress(bytes);
+  } catch {
+    return null;
+  }
+}
+
+function shortWalletAddress(address) {
+  const compact = String(address || "").replace(/\s+/g, "");
+  if (compact.length <= 14) return compact;
+  return `${compact.slice(0, 8)}…${compact.slice(-6)}`;
 }
 
 function rpcUrlForEnv(env) {
