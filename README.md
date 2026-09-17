@@ -226,7 +226,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper protocol and A
 | Home | Introduces Nimgavel and directs users into the auction flow |
 | Auction Floor | Browse live, upcoming and completed lots |
 | Auction Room | Timer, leader, bids, removals, fulfillment and settlement |
-| Host | Create and control an auction |
+| Host | Create and control an auction, with a direct mobile shortcut back to your auctions |
 | Results Ledger | Completed auctions and settlement state |
 | Leaderboard | Auction activity and winning history |
 | How It Works | Auction lifecycle and trust boundaries |
@@ -265,6 +265,7 @@ A separate user rated their experience **95.9/100**, specifically praising the U
 | **User 5** | Recent hammer results moved while they were reading, Results/Auction Floor loaded slowly, and they wanted clearer guidance on what can be auctioned | Reduced disruptive result refreshes, stopped embedding large base64 images in list responses, and clarified auctionable items and empty-auction behavior |
 | **User 6** | Wanted delivery/collection terms agreed before bidding and asked how to complain if an item arrives late or never arrives | Added fulfillment terms before bidding, explicit bidder acknowledgement, and expanded the roadmap for delivery status and complaints |
 | **User 7** | Asked what assurance a buyer has after paying and compared the experience to Amazon | Clarified that Nimgavel verifies auction/payment evidence but does not currently guarantee physical delivery, provide escrow or arbitrate disputes |
+| **User 8** | Said hosted auctions were hard to find quickly on mobile and suggested a My Auctions button in the sidebar | Added a My Auctions shortcut to the mobile drawer that jumps directly to the user's auction section |
 
 This feedback came from real product usage and has directly shaped the current flow.
 
