@@ -30,7 +30,7 @@ export function renderNav(container, { activePath = "/" } = {}) {
               <a href="/leaderboard" class="nav-link ${isBoard ? "active" : ""}">Leaderboard</a>
             </li>
             <li>
-              <a href="/how-it-works" class="nav-link ${isDocs ? "active" : ""}">How It Works</a>
+              <a href="/how-it-works" class="nav-link ${isDocs ? "active" : ""}">New? Start Here</a>
             </li>
           </ul>
 
@@ -64,7 +64,7 @@ export function renderNav(container, { activePath = "/" } = {}) {
           <a href="/lobby" class="mobile-link">Auction Floor</a>
           <a href="/results" class="mobile-link">Past Results</a>
           <a href="/leaderboard" class="mobile-link">Leaderboard</a>
-          <a href="/how-it-works" class="mobile-link">How It Works</a>
+          <a href="/how-it-works" class="mobile-link">New to Nimiq? Start Here</a>
           ${isHost ? "" : `<a href="/host" class="mobile-link">Host an Auction</a>`}
         </div>
       </div>
@@ -83,7 +83,7 @@ export function renderNav(container, { activePath = "/" } = {}) {
   }
 
   // Swap CTA text if opened inside Nimiq Pay webview
-  if (typeof window !== "undefined" && window.nimiq) {
+  if (typeof window !== "undefined" && (window.nimiq || window.nimiqPay)) {
     const cta = container.querySelector("#nav-cta-btn span:first-child");
     if (cta && !(isLobby || activePath.startsWith("/room"))) cta.textContent = "Enter Floor";
   }
