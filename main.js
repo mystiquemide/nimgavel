@@ -13,12 +13,58 @@ import { renderTerms } from "./views/terms.js";
 import { renderLeaderboard } from "./views/leaderboard.js";
 
 let cleanup = null;
+let hashObserver = null;
+let hashObserverTimer = null;
 
 function initApp() {
   const app = document.getElementById("app");
   if (!app) return;
 
+  function stopHashObserver() {
+    if (hashObserver) hashObserver.disconnect();
+    hashObserver = null;
+    if (hashObserverTimer) clearTimeout(hashObserverTimer);
+    hashObserverTimer = null;
+  }
+
+  function scrollToRouteTarget(mainContent) {
+    stopHashObserver();
+    const hash = window.location.hash;
+    if (!hash || hash === "#") {
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    let id;
+    try {
+      id = decodeURIComponent(hash.slice(1));
+    } catch {
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    const scrollIfReady = () => {
+      const target = document.getElementById(id);
+      if (!target) return false;
+      target.scrollIntoView({ block: "start" });
+      return true;
+    };
+
+    if (scrollIfReady()) return;
+
+    // Some Nimiq Pay routes render their final content only after the wallet
+    // bridge finishes connecting. Keep the section request alive until that
+    // content appears so links such as My Auctions still land correctly.
+    window.scrollTo(0, 0);
+    hashObserver = new MutationObserver(() => {
+      if (scrollIfReady()) stopHashObserver();
+    });
+    hashObserver.observe(mainContent, { childList: true, subtree: true });
+    hashObserverTimer = setTimeout(stopHashObserver, 60_000);
+  }
+
   function handleRoute() {
+    stopHashObserver();
     if (cleanup) {
       try { cleanup(); } catch { /* view already gone */ }
       cleanup = null;
@@ -105,7 +151,7 @@ function initApp() {
       renderNotFound(mainContent);
     }
 
-    window.scrollTo(0, 0);
+    scrollToRouteTarget(mainContent);
   }
 
   // Intercept relative client-side navigation clicks
