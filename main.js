@@ -54,6 +54,20 @@ function initApp() {
     if (path === "/" || path === "") {
       cleanup = renderLanding(mainContent) || null;
     } else if (path === "/lobby") {
+      // Never leave the route visually blank while the first lots/room API
+      // requests are in flight. The lobby view replaces this immediately
+      // when its first render completes.
+      mainContent.innerHTML = `
+        <div class="quiet-floor-state" role="status" aria-live="polite">
+          <div class="quiet-icon-box" aria-hidden="true">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <h1 class="quiet-title">Opening the auction floor…</h1>
+          <p class="quiet-desc">Loading live lots, bids, and room status.</p>
+        </div>`;
       cleanup = renderLobby(mainContent) || null;
     } else if (path.startsWith("/room/")) {
       const lotId = path.replace("/room/", "").split("/")[0];
