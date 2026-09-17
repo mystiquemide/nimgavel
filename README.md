@@ -314,19 +314,21 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper protocol and A
 
 **RECORDED** — Early users have created auction rooms, entered rooms on mobile, connected Nimiq Pay, navigated the auction surfaces and exercised the mainnet flow. Some users successfully placed bids, while balance-backed bidder access is still being retested across Nimiq Pay account configurations.
 
+The anonymous labels below distinguish separate testing sessions. Names and handles are withheld from the public README.
+
 > “The UI is smooth, there’s a beginner guide, and it’s so easy to navigate.”  
-> — Early mobile user
+> — **User 1 · Mobile mainnet test**
 
 > “Bidding on an open auction item was seamless.”  
-> — Nimgavel user
+> — **User 2 · Live auction test**
 
 > “Basically, your own mini auction house, powered by Nimiq.”  
-> — First-time Nimgavel user
+> — **User 3 · First-time Nimgavel test**
 
 > “Overall user experience on mobile was okay. I didn’t need an explainer to understand.”  
-> — Mobile Nimiq Pay tester
+> — **User 4 · Mobile Nimiq Pay test**
 
-**RECORDED** — One tester rated their experience **95.9/100**, specifically praising the UI, brand consistency and working navigation. This is one tester's rating, not an aggregate product score.
+**RECORDED** — A separate tester rated their experience **95.9/100**, specifically praising the UI, brand consistency and working navigation. This is one tester's rating, not an aggregate product score.
 
 ## User feedback changed the product
 
