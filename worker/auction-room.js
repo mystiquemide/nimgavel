@@ -227,6 +227,13 @@ export class AuctionRoom {
     await this.armAlarm(now);
     if (session) session.lastBidAt = now;
 
+    // Archive valid bids immediately so the public leaderboard reflects
+    // live activity. D1 is secondary to the room state: if this write is
+    // temporarily unavailable, finalization still backfills the full log.
+    try {
+      await this.persistBidToD1(bid);
+    } catch {}
+
     this.broadcast({ type: "bid", revision, id: bidKey(bid), paddle, alias, amountLunas, ts: now, endsAt: this.endsAt, serverNow: now });
     if (this.phase !== prevPhase && this.phase !== "sold") {
       this.broadcast({ type: "phase", revision, phase: this.phase, endsAt: this.endsAt, serverNow: now });
@@ -521,6 +528,13 @@ export class AuctionRoom {
   }
 
   // ---------- D1 persistence ----------
+
+  async persistBidToD1(bid) {
+    if (!this.env.DB || !this.lot || !bid) return;
+    await this.env.DB.prepare(
+      "INSERT OR IGNORE INTO bids (lot_id, paddle, amount_lunas, created_at) VALUES (?, ?, ?, ?)"
+    ).bind(this.lot.id, bid.paddle, bid.amountLunas, bid.ts).run();
+  }
 
   async persistToD1(patch) {
     if (!this.env.DB || !this.lot) return;
