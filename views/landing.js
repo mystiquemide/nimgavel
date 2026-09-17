@@ -102,7 +102,44 @@ export function renderLanding(container) {
       <div class="results-grid" data-animate-stagger id="landing-results-grid"></div>
     </section>
 
-    <!-- SECTION 5: FINAL CALL TO ACTION -->
+    <!-- SECTION 5: LIVE COMMUNITY FEEDBACK -->
+    <section class="rules-section" id="community-feedback" aria-labelledby="community-feedback-heading">
+      <div class="rules-header" data-animate="fade-up">
+        <span class="rules-kicker">LIVE COMMUNITY FEEDBACK</span>
+        <h2 id="community-feedback-heading" class="rules-title">What early Nimgavel users are saying</h2>
+        <p class="rules-subhead">Real feedback from people creating rooms, bidding, and using Nimiq Pay on Nimiq mainnet.</p>
+      </div>
+
+      <div class="rules-grid" data-animate-stagger>
+        <article class="rule-card rule-card-white" data-animate-child>
+          <div class="rule-badge-row">
+            <span class="rule-step-badge">EARLY USER</span>
+          </div>
+          <p class="rule-card-text">“The UI is smooth, there’s a beginner guide, and it’s so easy to navigate.”</p>
+          <p class="lot-meta">Mobile mainnet user</p>
+        </article>
+
+        <article class="rule-card rule-card-gold" data-animate-child>
+          <div class="rule-badge-row">
+            <span class="rule-step-badge rule-badge-primary">LIVE BIDDING</span>
+          </div>
+          <p class="rule-card-text">“Bidding on an open auction item was seamless.”</p>
+          <p class="lot-meta">Early Nimgavel user</p>
+        </article>
+
+        <article class="rule-card rule-card-green" data-animate-child>
+          <div class="rule-badge-row">
+            <span class="rule-step-badge rule-badge-green">FIRST IMPRESSION</span>
+          </div>
+          <p class="rule-card-text">“Basically, your own mini auction house, powered by Nimiq.”</p>
+          <p class="lot-meta">First-time Nimgavel user</p>
+        </article>
+      </div>
+
+      <p class="hero-boundary-note" data-animate="fade-up">Running on Nimiq mainnet · Host → Bid → Win → Pay → Verify on-chain</p>
+    </section>
+
+    <!-- SECTION 6: FINAL CALL TO ACTION -->
     <section class="final-cta-section" aria-labelledby="final-cta-heading">
       <div class="final-cta-box" data-animate="scale-in">
         <span class="final-cta-pill">HOST YOUR OWN</span>
@@ -124,7 +161,7 @@ export function renderLanding(container) {
       </div>
     </section>
 
-    <!-- SECTION 6: FOOTER -->
+    <!-- SECTION 7: FOOTER -->
     <footer class="site-footer" role="contentinfo">
       <div class="footer-main">
         <div class="footer-brand-col">
