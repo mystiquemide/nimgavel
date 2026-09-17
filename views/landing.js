@@ -2,11 +2,11 @@ import { listLots, getRoomState, ApiError } from "../lib/api.js";
 import { formatNim } from "../lib/nimiq.js";
 import { escapeHtml, escapeAttr, shortAddress } from "./room.js";
 
-const HERO_POLL_MS = 5000;
+const HERO_POLL_MS = 10000;
 
 export function renderLanding(container) {
   let disposed = false;
-  const state = { lots: null, room: null, timer: null };
+  const state = { lots: null, room: null, timer: null, resultsSignature: null };
 
   container.innerHTML = `
     <section class="hero-section" aria-labelledby="hero-heading">
@@ -319,6 +319,16 @@ export function renderLanding(container) {
 
   function renderResults() {
     const results = (state.lots?.results || []).slice(0, 3);
+    const signature = results.map((lot) => [
+      lot.id,
+      lot.status,
+      lot.txHash || "",
+      lot.settlement?.state || "",
+      lot.winningBidLunas ?? ""
+    ].join(":" )).join("|");
+    if (state.resultsSignature === signature) return;
+    state.resultsSignature = signature;
+
     if (!results.length) {
       resultsGrid.innerHTML = `
         <p class="results-preview-subhead" style="grid-column:1/-1">
