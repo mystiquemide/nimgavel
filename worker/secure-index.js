@@ -8,6 +8,7 @@ import {
   publicKeyToNimiqAddress,
   verifyNimiqSignedMessage
 } from "./auth.js";
+import { BalanceLookupError, fetchNimBalance } from "./nimiq-balance.js";
 import {
   BIDDER_PROOF_TTL_MS,
   BIDDER_PROOF_VERSION,
@@ -17,7 +18,6 @@ import {
 
 const MAINNET_RPC_URL = "https://rpc.nimiqwatch.com";
 const TESTNET_RPC_URL = "https://rpc.testnet.nimiqwatch.com";
-const RPC_TIMEOUT_MS = 6000;
 const PROOF_CLOCK_SKEW_MS = 60_000;
 const MAX_LIST_LIMIT = 100;
 const DEFAULT_LIST_LIMIT = 50;
@@ -105,9 +105,16 @@ export class AuctionRoom extends BaseAuctionRoom {
       return super.webSocketMessage(server, data);
     }
 
+    let walletAddress = null;
     try {
-      const walletAddress = await this.authorizeBidderWallet(session, message.bidderProof);
+      walletAddress = await this.authorizeBidderWallet(session, message.bidderProof);
       const balanceLunas = await fetchNimBalance(walletAddress, rpcUrlForEnv(this.env));
+      if (balanceLunas === 0) {
+        throw new BidGuardError(
+          "insufficient_balance",
+          `Nimgavel checked ${walletAddress} on Nimiq mainnet twice and the chain reported 0 NIM. Make sure this exact NIM account is the one you funded in Nimiq Pay, then retry.`
+        );
+      }
       if (balanceLunas < message.amountLunas) {
         throw new BidGuardError(
           "insufficient_balance",
@@ -116,9 +123,14 @@ export class AuctionRoom extends BaseAuctionRoom {
       }
     } catch (error) {
       const code = error instanceof BidGuardError ? error.code : "balance_unavailable";
-      const text = error instanceof BidGuardError
-        ? error.message
-        : "Nimgavel could not verify your live NIM balance. Please try the bid again.";
+      let text;
+      if (error instanceof BidGuardError) {
+        text = error.message;
+      } else if (error instanceof BalanceLookupError && walletAddress) {
+        text = `Nimgavel could not read the on-chain balance for ${shortWalletAddress(walletAddress)} after retrying. Your wallet was not treated as 0 NIM. Please try again.`;
+      } else {
+        text = "Nimgavel could not verify your live NIM balance. Please try the bid again.";
+      }
       try { server.send(JSON.stringify({ type: "error", code, message: text })); } catch {}
       return;
     }
@@ -316,39 +328,6 @@ function decodeLotId(value) {
   } catch {
     return "";
   }
-}
-
-async function fetchNimBalance(walletAddress, rpcUrl) {
-  let response;
-  try {
-    response = await fetch(rpcUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getAccountByAddress",
-        params: [walletAddress]
-      }),
-      signal: AbortSignal.timeout(RPC_TIMEOUT_MS)
-    });
-  } catch {
-    throw new Error("rpc unavailable");
-  }
-
-  if (!response.ok) throw new Error("rpc unavailable");
-  let payload;
-  try { payload = await response.json(); }
-  catch { throw new Error("rpc unavailable"); }
-
-  if (payload?.error) throw new Error("rpc rejected account lookup");
-  // Nimiq RPC clients have exposed both a direct account result and a
-  // { data: account } envelope over time. Accept both without turning a valid
-  // funded account into a false zero/unavailable result.
-  const rawBalance = payload?.result?.balance ?? payload?.result?.data?.balance;
-  const balance = Number(rawBalance);
-  if (!Number.isSafeInteger(balance) || balance < 0) throw new Error("invalid balance response");
-  return balance;
 }
 
 function walletAddressFromPublicKey(publicKey) {
