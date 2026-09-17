@@ -1,3 +1,4 @@
+import "./lib/bid-balance-guard.js";
 import { renderNav } from "./components/nav.js";
 import { renderLanding } from "./views/landing.js";
 import { renderLobby } from "./views/lobby.js";
