@@ -14,7 +14,37 @@ const TESTNET_RPC_URL = "https://rpc.testnet.nimiqwatch.com";
 const RPC_TIMEOUT_MS = 6000;
 const PROOF_CLOCK_SKEW_MS = 60_000;
 
-export default worker;
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    if (request.method === "GET" && url.pathname === "/health") {
+      const response = await worker.fetch(request, env, ctx);
+      let payload;
+      try {
+        payload = await response.json();
+      } catch {
+        return response;
+      }
+
+      const version = env.CF_VERSION_METADATA;
+      return new Response(JSON.stringify({
+        ...payload,
+        buildId: version?.id || env.BUILD_ID || "local",
+        versionTag: version?.tag || null,
+        versionTimestamp: version?.timestamp || null
+      }), {
+        status: response.status,
+        headers: response.headers
+      });
+    }
+
+    return worker.fetch(request, env, ctx);
+  },
+
+  async scheduled(event, env, ctx) {
+    return worker.scheduled(event, env, ctx);
+  }
+};
 
 export class AuctionRoom extends BaseAuctionRoom {
   async webSocketMessage(server, data) {
