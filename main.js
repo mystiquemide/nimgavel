@@ -77,6 +77,21 @@ function initApp() {
     } else if (path === "/host") {
       cleanup = renderHost(mainContent) || null;
     } else if (path === "/results") {
+      // Results used to stay visually empty until /api/lots returned. On a
+      // slower mobile connection that looked like a broken route because only
+      // the nav/footer were visible. Keep an explicit loading state in place
+      // until renderResults replaces it with the ledger or an error state.
+      mainContent.innerHTML = `
+        <div class="quiet-floor-state" role="status" aria-live="polite">
+          <div class="quiet-icon-box" aria-hidden="true">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <h1 class="quiet-title">Opening the results ledger…</h1>
+          <p class="quiet-desc">Loading auction outcomes and settlement records.</p>
+        </div>`;
       cleanup = renderResults(mainContent) || null;
     } else if (path === "/leaderboard") {
       cleanup = renderLeaderboard(mainContent) || null;
