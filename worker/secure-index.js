@@ -13,10 +13,35 @@ const MAINNET_RPC_URL = "https://rpc.nimiqwatch.com";
 const TESTNET_RPC_URL = "https://rpc.testnet.nimiqwatch.com";
 const RPC_TIMEOUT_MS = 6000;
 const PROOF_CLOCK_SKEW_MS = 60_000;
+const MAX_LIST_LIMIT = 100;
+const DEFAULT_LIST_LIMIT = 50;
+const LIST_COLUMNS = `id,title,description,host_paddle,host_address,
+  start_price_lunas,min_increment_lunas,duration_sec,status,scheduled_at,
+  started_at,ended_at,winning_paddle,winning_bid_lunas,tx_hash,created_at,
+  settle_verified,settle_checked_at,settle_failure`;
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    // List pages do not need embedded base64 photos. Returning image endpoints
+    // instead keeps Auction Floor / Results payloads small on mobile while the
+    // immutable lot photos load independently and can be cached by the browser.
+    if (request.method === "GET" && url.pathname === "/api/lots") {
+      try {
+        return await listLotsLightweight(env, url);
+      } catch {
+        // Preserve the existing router as a safe fallback if the optimized read
+        // ever encounters an unexpected schema/runtime problem.
+        return worker.fetch(request, env, ctx);
+      }
+    }
+
+    const imageMatch = url.pathname.match(/^\/api\/lots\/([^/]+)\/image$/);
+    if (request.method === "GET" && imageMatch) {
+      return serveLotImage(request, env, decodeLotId(imageMatch[1]));
+    }
+
     if (request.method === "GET" && url.pathname === "/health") {
       const response = await worker.fetch(request, env, ctx);
       let payload;
@@ -141,6 +166,131 @@ export class AuctionRoom extends BaseAuctionRoom {
     session.bidderWallet = walletAddress;
     session.bidderProofExpiresAt = expiresAt;
     return walletAddress;
+  }
+}
+
+async function listLotsLightweight(env, url) {
+  if (!env.DB) throw new Error("database unavailable");
+  const limit = listLimit(url.searchParams.get("limit"));
+  const groups = [
+    ["live", "status = 'live'", "started_at DESC"],
+    ["upcoming", "status = 'created'", "COALESCE(scheduled_at, created_at) DESC"],
+    ["results", "status IN ('sold', 'settled', 'passed')", "ended_at DESC"]
+  ];
+
+  const entries = await Promise.all(groups.map(async ([name, filter, order]) => {
+    const result = await env.DB.prepare(
+      `SELECT ${LIST_COLUMNS} FROM lots WHERE ${filter} ORDER BY ${order}, id ASC LIMIT ?`
+    ).bind(limit).all();
+    return [name, (result.results || []).map(toListLot)];
+  }));
+
+  return new Response(JSON.stringify(Object.fromEntries(entries)), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+      "referrer-policy": "no-referrer"
+    }
+  });
+}
+
+function toListLot(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description || "",
+    imageUrl: `/api/lots/${encodeURIComponent(row.id)}/image`,
+    hostPaddle: numberOrNull(row.host_paddle),
+    hostAddress: row.host_address,
+    startPriceLunas: numberOrNull(row.start_price_lunas),
+    minIncrementLunas: numberOrNull(row.min_increment_lunas),
+    durationSec: numberOrNull(row.duration_sec),
+    status: row.status,
+    scheduledAt: numberOrNull(row.scheduled_at),
+    startedAt: numberOrNull(row.started_at),
+    endedAt: numberOrNull(row.ended_at),
+    winningPaddle: numberOrNull(row.winning_paddle),
+    winningBidLunas: numberOrNull(row.winning_bid_lunas),
+    txHash: row.tx_hash || null,
+    settlement: listSettlement(row),
+    createdAt: numberOrNull(row.created_at)
+  };
+}
+
+function listSettlement(row) {
+  const settled = row.status === "settled";
+  if (!settled && row.status !== "sold") return null;
+  if (!row.tx_hash && !settled) return null;
+  if (Number(row.settle_verified || 0) === 1) return { state: "verified" };
+  const failure = String(row.settle_failure || "");
+  if (failure.startsWith("rejected:")) {
+    return { state: "rejected", reason: failure.slice("rejected:".length) };
+  }
+  if (!row.tx_hash) return null;
+  return { state: "pending" };
+}
+
+async function serveLotImage(request, env, lotId) {
+  if (!env.DB) return new Response("Image unavailable.", { status: 503 });
+  const row = await env.DB.prepare("SELECT image_url FROM lots WHERE id = ?").bind(lotId).first();
+  if (!row) return new Response("Lot not found.", { status: 404 });
+
+  const value = typeof row.image_url === "string" ? row.image_url : "";
+  if (!value) {
+    return Response.redirect(new URL("/favicon.svg", request.url).href, 302);
+  }
+  if (value.startsWith("https://")) {
+    return Response.redirect(value, 302);
+  }
+
+  const match = value.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return Response.redirect(new URL("/favicon.svg", request.url).href, 302);
+
+  let binary;
+  try {
+    binary = atob(match[2]);
+  } catch {
+    return Response.redirect(new URL("/favicon.svg", request.url).href, 302);
+  }
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      "content-type": `image/${match[1]}`,
+      "cache-control": "public, max-age=31536000, immutable",
+      "x-content-type-options": "nosniff"
+    }
+  });
+}
+
+function listLimit(value) {
+  if (value === null) return DEFAULT_LIST_LIMIT;
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 1 || number > MAX_LIST_LIMIT) {
+    return DEFAULT_LIST_LIMIT;
+  }
+  return number;
+}
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function decodeLotId(value) {
+  try {
+    const lotId = decodeURIComponent(value);
+    if (!lotId || lotId.length > 128 || /[\r\n]/.test(lotId)) throw new Error("invalid lot id");
+    return lotId;
+  } catch {
+    return "";
   }
 }
 
