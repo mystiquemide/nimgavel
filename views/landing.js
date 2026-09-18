@@ -237,6 +237,7 @@ export function renderLanding(container) {
                 </a>
               </li>
               <li><a href="/how-it-works" class="footer-link">How It Works</a></li>
+              <li><a href="/docs" class="footer-link">Documentation</a></li>
               <li><a href="/privacy" class="footer-link">Privacy</a></li>
               <li><a href="/terms" class="footer-link">Terms</a></li>
             </ul>
