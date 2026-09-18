@@ -267,6 +267,8 @@ A separate user rated their experience **95.9/100**, specifically praising the U
 | **User 7** | Asked what assurance a buyer has after paying and compared the experience to Amazon | Clarified that Nimgavel verifies auction/payment evidence but does not currently guarantee physical delivery, provide escrow or arbitrate disputes |
 | **User 8** | Said hosted auctions were hard to find quickly on mobile and suggested a My Auctions button in the sidebar | Added a My Auctions shortcut to the mobile drawer that jumps directly to the user's auction section |
 | **User 9** | Said someone discovering Nimgavel inside Nimiq Pay first would struggle to find their way back to auctions without website context | Added an app-first home section with My Auctions, Joined Auctions and Recently Viewed, plus a Recent & Joined shortcut in the mobile drawer. Room visits and successful bid participation are remembered locally for direct return links |
+| **User 10** | Opened an auction from Nimiq Pay but Nimgavel still behaved like a normal browser and asked them to open Nimiq Pay again | Hardened wallet-context recovery so both supported Nimiq Pay bridge signals can trigger provider fallback and delayed reconnection instead of leaving the room in spectator mode |
+| **User 11** | Liked the Nimiq Pay-centered auction flow and found auction creation easy, but said the landing page took too long to explain the product, the mobile preview appeared too late, and signing/publishing states were unclear | Tightened the hero copy, moved a clear auction preview before the mobile signing action, and added explicit creation stages for preparing, wallet confirmation, publishing and completion |
 
 This feedback came from real product usage and has directly shaped the current flow.
 
