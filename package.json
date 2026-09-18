@@ -23,7 +23,7 @@
     "type": "git",
     "url": "git+https://github.com/mystiquemide/nimgavel.git"
   },
-  "homepage": "https://nimgavel.artistic-chip.workers.dev",
+  "homepage": "https://nimgavel.midelabs.xyz",
   "dependencies": {
     "@nimiq/core": "^2.7.1",
     "@nimiq/mini-app-sdk": "^0.1.0",
