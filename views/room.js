@@ -59,8 +59,9 @@ export function renderRoom(container, lotId) {
   }
 
   function canBid() {
+    const ms = remaining();
     return walletReady() && session.paddle !== null && session.paddle !== state.hostPaddle && state.socketStatus === "open" &&
-      ["live", "going_once", "going_twice"].includes(state.phase);
+      ["live", "going_once", "going_twice"].includes(state.phase) && (ms === null || ms > 0);
   }
 
   function render() {
@@ -209,7 +210,7 @@ export function renderRoom(container, lotId) {
             </div>
           </div>
         </div>
-        ${!["sold", "settled", "passed"].includes(state.phase) ? `
+        ${!["sold", "settled", "passed"].includes(state.phase) && remaining() !== 0 ? `
         <div class="room-sticky-bid-bar" aria-label="Current bid summary">
           <div class="sticky-bid-info">
             <span class="sticky-bid-label">${state.currentBid ? "CURRENT HIGH BID" : "OPENING BID"}</span>
@@ -419,6 +420,16 @@ export function renderRoom(container, lotId) {
   }
 
   function renderActionSection() {
+    // Once the authoritative deadline is reached, never leave stale bid
+    // controls visible while the room waits for the server result.
+    if (remaining() === 0 && !["sold", "settled", "passed"].includes(state.phase)) {
+      return `
+        <div class="spectate-deck-note">
+          <p class="spectate-deck-text">Bidding has closed. Waiting for the server to finalize the result…</p>
+        </div>
+      `;
+    }
+
     // Concluded rooms show settlement surfaces instead of paddles.
     if (["sold", "settled"].includes(state.phase)) {
       const iWon = state.sold && session.paddle !== null && state.sold.winningPaddle === session.paddle;
