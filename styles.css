@@ -3958,3 +3958,198 @@ body.animate-ready [data-animate-stagger].in-view > [data-animate-child]:nth-chi
   .lb-row { flex-wrap: wrap; }
   .lb-stats { margin-left: 50px; width: 100%; justify-content: flex-start; }
 }
+
+
+/* Full documentation page */
+.docs-view { max-width: 980px; }
+.docs-eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--green-bold);
+}
+.docs-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.docs-quick-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1.5px dashed var(--ink-muted);
+  border-radius: 999px;
+  background: var(--canvas-card);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.docs-quick-links a:hover,
+.docs-quick-links a:focus-visible {
+  border-color: var(--green-bold);
+  background: var(--gold-wheat);
+}
+.docs-callout {
+  padding: 24px;
+  border: 1.5px dashed var(--green-bold);
+  border-radius: 20px;
+  background: var(--gold-wheat);
+}
+.docs-flow,
+.docs-state-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0;
+}
+.docs-flow span,
+.docs-state-row code {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--canvas-card);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+.docs-flow b,
+.docs-state-row b {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+.docs-table-wrap {
+  overflow-x: auto;
+  margin: 14px 0;
+  border: 1.5px dashed var(--ink-muted);
+  border-radius: 16px;
+  background: var(--canvas-card);
+}
+.docs-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+}
+.docs-table th,
+.docs-table td {
+  padding: 13px 14px;
+  border-bottom: 1px dashed var(--ink-muted);
+  text-align: left;
+  vertical-align: top;
+  color: var(--ink-muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.docs-table th {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  background: var(--gold-wheat);
+}
+.docs-table td:first-child {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+.docs-table tr:last-child td { border-bottom: 0; }
+.docs-table code,
+.doc-section code {
+  font-family: var(--font-mono);
+  font-size: 0.94em;
+  color: var(--ink);
+}
+.docs-architecture-grid,
+.docs-trust-grid,
+.docs-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+.docs-mini-card,
+.docs-resource-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 16px;
+  border: 1.5px dashed var(--ink-muted);
+  border-radius: 16px;
+  background: var(--canvas-card);
+}
+.docs-mini-card > span {
+  color: var(--green-bold);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.docs-mini-card > strong,
+.docs-resource-card > strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+.docs-mini-card p {
+  margin: 0;
+  font-size: 13.5px;
+}
+.docs-good { border-color: var(--green-bold); }
+.docs-boundary { border-color: var(--coral-accent); }
+.docs-code-block {
+  overflow-x: auto;
+  margin: 18px 0;
+  padding: 18px;
+  border: 1.5px dashed var(--ink);
+  border-radius: 16px;
+  background: var(--ink-dark);
+}
+.docs-code-block code {
+  display: block;
+  min-width: max-content;
+  white-space: pre;
+  color: var(--canvas-card);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.docs-resource-card {
+  min-height: 98px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.docs-resource-card span {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.docs-resource-card:hover,
+.docs-resource-card:focus-visible {
+  border-color: var(--green-bold);
+  background: var(--gold-wheat);
+}
+@media (max-width: 720px) {
+  .docs-architecture-grid,
+  .docs-trust-grid,
+  .docs-resource-grid {
+    grid-template-columns: 1fr;
+  }
+  .docs-callout { padding: 18px; }
+  .docs-flow { gap: 6px; }
+  .docs-flow span,
+  .docs-state-row code {
+    min-height: 32px;
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+}
