@@ -46,6 +46,8 @@
   &nbsp;&nbsp;•&nbsp;&nbsp;
   <a href="https://nimgavel.midelabs.xyz/how-it-works">How It Works</a>
   &nbsp;&nbsp;•&nbsp;&nbsp;
+  <a href="https://nimgavel.midelabs.xyz/docs">Documentation</a>
+  &nbsp;&nbsp;•&nbsp;&nbsp;
   <a href="https://nimgavel.midelabs.xyz/results">Results</a>
   &nbsp;&nbsp;•&nbsp;&nbsp;
   <a href="https://nimgavel.midelabs.xyz/leaderboard">Leaderboard</a>
@@ -229,7 +231,8 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper protocol and A
 | Host | Create and control an auction, with a direct mobile shortcut back to your auctions |
 | Results Ledger | Completed auctions and settlement state |
 | Leaderboard | Auction activity and winning history |
-| How It Works | Auction lifecycle and trust boundaries |
+| How It Works | First-time auction lifecycle and wallet guide |
+| Documentation | Product mechanics, Nimiq Pay integration, architecture, API, settlement verification, trust boundaries and troubleshooting |
 | Privacy & Terms | Product responsibilities and limitations |
 
 A normal browser can browse and spectate. Hosting, authenticated bidding and wallet settlement are handled inside Nimiq Pay.
