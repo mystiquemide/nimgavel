@@ -109,7 +109,7 @@ Nimgavel keeps a bounded set of NIM addresses shared by Nimiq Pay, binds that ac
 
 Funds remain in the bidder's wallet until settlement. The balance check is an access guard, not a lock or escrow.
 
-We are still verifying this balance-backed bidder flow across different Nimiq Pay account layouts after some mobile users reported false `0 NIM` results. The multi-account flow is deployed and covered by CI, but the affected users still need to confirm the current build on their devices.
+The multi-account balance flow is deployed and covered by CI. A real two-device mainnet run on September 18 confirmed that a funded Nimiq Pay bidder could pass the balance gate and place accepted bids from a separate mobile device. Broader device/account-layout coverage remains part of ongoing validation because earlier users reported false `0 NIM` results.
 
 ### 3. Soft close
 
@@ -332,7 +332,19 @@ winner pays in Nimiq Pay
 Nimgavel verifies settlement
 ```
 
-The final judge bundle is designed around the live app, repository access, architecture, automated tests, a two-device auction recording, soft-close and bid-removal captures, and a genuine verified mainnet NIM payment.
+The judge bundle is built around the live app, repository access, architecture, automated tests, real two-device auction evidence, soft-close and bid-removal captures, and a genuine verified mainnet NIM payment.
+
+### Mainnet settlement proof
+
+A real two-device auction completed from live bidding through winner payment and Nimgavel settlement verification on September 18, 2026.
+
+- Winning paddle: **#12 · Calm Finch**
+- Winning bid: **3 NIM**
+- Payment: winner → host through Nimiq Pay
+- Transaction reference: `Nimgavel:<lotId>`
+- Verified transaction: [`0c0901c81a0db2fb792da6107a690b74270dc391b55fb12b980d938d4465aa74`](https://nimiq.watch/#0c0901c81a0db2fb792da6107a690b74270dc391b55fb12b980d938d4465aa74)
+
+The same run also confirmed separate host and bidder paddles, live WebSocket synchronization, balance-backed bidding, winner locking and the winner-only payment surface. A clean visual soft-close capture is still being collected separately.
 
 ## Testing and CI
 
