@@ -14,7 +14,6 @@ This roadmap describes proposed work, not shipped capabilities. Progress depends
 - ✅ Confirm bidders cannot place a first bid until they explicitly acknowledge the published delivery / collection terms.
 - ✅ Confirm hosts are prompted to publish the fulfillment method, service area or collection location context, expected timeframe, costs, and handoff method without exposing a private home address.
 - ✅ Capture a successful real payment receipt and transaction hash: `0c0901c81a0db2fb792da6107a690b74270dc391b55fb12b980d938d4465aa74`.
-- Capture one clean visual soft-close extension by placing a valid bid inside the final 30 seconds.
 - Capture one clean bid-removal proof if it is going into the judge bundle.
 - Confirm listing provenance. Clearly label demonstrations so users cannot mistake them for available goods.
 - Confirm submission eligibility, registration, and required promotion.
