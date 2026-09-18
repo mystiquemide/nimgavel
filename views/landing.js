@@ -484,7 +484,7 @@ export function renderLanding(container) {
   initScrollAnimations(container);
 
   // Adapt CTA if opened inside Nimiq Pay
-  if (typeof window !== "undefined" && window.nimiq) {
+  if (typeof window !== "undefined" && (window.nimiq || window.nimiqPay)) {
     const btn = container.querySelector("#hero-enter-btn span:first-child");
     if (btn) btn.textContent = "Enter Floor";
   }
