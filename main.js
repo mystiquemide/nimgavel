@@ -10,6 +10,7 @@ import { renderNotFound } from "./views/not-found.js";
 import { renderHowItWorks } from "./views/how-it-works.js";
 import { renderPrivacy } from "./views/privacy.js";
 import { renderTerms } from "./views/terms.js";
+import { renderDocs } from "./views/docs.js";
 import { renderLeaderboard } from "./views/leaderboard.js";
 
 let cleanup = null;
@@ -71,7 +72,7 @@ function initApp() {
     }
 
     const path = window.location.pathname;
-    const titles = { "/": "Live Community Auctions", "/lobby": "Auction Floor", "/host": "Host an Auction", "/results": "Results Ledger", "/leaderboard": "Leaderboard", "/how-it-works": "How It Works", "/privacy": "Privacy", "/terms": "Terms" };
+    const titles = { "/": "Live Community Auctions", "/lobby": "Auction Floor", "/host": "Host an Auction", "/results": "Results Ledger", "/leaderboard": "Leaderboard", "/how-it-works": "How It Works", "/docs": "Documentation", "/privacy": "Privacy", "/terms": "Terms" };
     document.title = `${titles[path] || (path.startsWith("/room/") ? "Auction Room" : "Page Not Found")} · Nimgavel`;
     const isLanding = path === "/" || path === "";
 
@@ -85,6 +86,7 @@ function initApp() {
         <nav class="trust-footer-links" aria-label="Trust links">
           <a href="/results">Results</a>
           <a href="/how-it-works">How It Works</a>
+          <a href="/docs">Docs</a>
           <a href="https://nimiq.watch" target="_blank" rel="noopener noreferrer">Nimiq Watch ↗</a>
           <a href="https://github.com/mystiquemide/nimgavel" target="_blank" rel="noopener noreferrer">Source ↗</a>
           <a href="https://www.nimiq.com/nimiq-pay" target="_blank" rel="noopener noreferrer">Nimiq Pay ↗</a>
@@ -143,6 +145,8 @@ function initApp() {
       cleanup = renderLeaderboard(mainContent) || null;
     } else if (path === "/how-it-works") {
       cleanup = renderHowItWorks(mainContent) || null;
+    } else if (path === "/docs") {
+      cleanup = renderDocs(mainContent) || null;
     } else if (path === "/privacy") {
       cleanup = renderPrivacy(mainContent) || null;
     } else if (path === "/terms") {
