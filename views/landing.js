@@ -21,7 +21,7 @@ export function renderLanding(container) {
             The live community auction house for Nimiq.
           </h1>
           <p class="hero-subhead">
-            Create live auctions, bid in real time, and pay the winner's final price directly from wallet to host in NIM. Nimiq Pay handles the wallet actions; Nimgavel runs the auction.
+            Create live auctions, bid in real time, and let the winner pay the final price directly from their wallet to the host in NIM. Nimiq Pay handles the wallet actions; Nimgavel runs the auction.
           </p>
 
           <div class="hero-cta-group">
