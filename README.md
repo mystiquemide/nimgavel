@@ -83,8 +83,6 @@ Network: **Nimiq mainnet**
 Settlement asset: **native NIM**  
 Competition: **Nimiq Pay Mini Apps Competition, Cycle II**
 
-The repository is currently private. Judge access can be granted as part of the final submission package.
-
 ## The auction loop
 
 ### 1. Create
