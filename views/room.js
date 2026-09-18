@@ -11,7 +11,7 @@ import { createRoomSocket } from "../lib/ws.js";
 import { markRecentLot, markJoinedLot } from "../lib/activity.js";
 import { qrToggleMarkup, wireQrToggle, storeLinksMarkup, walletTroubleCard } from "../lib/qr.js";
 
-const APP_ORIGIN = "https://nimgavel.artistic-chip.workers.dev";
+const APP_ORIGIN = "https://nimgavel.midelabs.xyz";
 
 export function renderRoom(container, lotId) {
   let disposed = false;
