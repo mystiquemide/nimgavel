@@ -332,7 +332,7 @@ winner pays in Nimiq Pay
 Nimgavel verifies settlement
 ```
 
-The judge bundle is built around the live app, repository access, architecture, automated tests, real two-device auction evidence, soft-close and bid-removal captures, and a genuine verified mainnet NIM payment.
+The judge bundle is built around the live app, repository access, architecture, automated tests, real two-device auction evidence, bid-removal evidence, and a genuine verified mainnet NIM payment.
 
 ### Mainnet settlement proof
 
@@ -344,7 +344,7 @@ A real two-device auction completed from live bidding through winner payment and
 - Transaction reference: `Nimgavel:<lotId>`
 - Verified transaction: [`0c0901c81a0db2fb792da6107a690b74270dc391b55fb12b980d938d4465aa74`](https://nimiq.watch/#0c0901c81a0db2fb792da6107a690b74270dc391b55fb12b980d938d4465aa74)
 
-The same run also confirmed separate host and bidder paddles, live WebSocket synchronization, balance-backed bidding, winner locking and the winner-only payment surface. A clean visual soft-close capture is still being collected separately.
+The same run also confirmed separate host and bidder paddles, live WebSocket synchronization, balance-backed bidding, winner locking and the winner-only payment surface. Soft close is enforced by the authoritative auction room and covered by the automated suite.
 
 ## Testing and CI
 
