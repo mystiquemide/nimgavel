@@ -18,7 +18,7 @@ export function renderLanding(container) {
             Going once. Going twice. <span class="kicker-sold" style="font-family: inherit; font-size: inherit; font-weight: 800; letter-spacing: inherit; padding: 0;">SOLD</span>. NIM.
           </p>
           <h1 id="hero-heading" class="hero-title">
-            The live community auction house for Nimiq.
+            The live community auction house on Nimiq.
           </h1>
           <p class="hero-subhead">
             Create live auctions, bid in real time, and let the winner pay the final price directly from their wallet to the host in NIM. Nimiq Pay handles the wallet actions; Nimgavel runs the auction.
