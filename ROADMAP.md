@@ -6,14 +6,16 @@ This roadmap describes proposed work, not shipped capabilities. Progress depends
 
 ## Before submission
 
-- Verify hosting, bidding, bid withdrawal, host moderation, settlement, and payment verification inside Nimiq Pay using multiple real devices.
-- Test balance-backed bidding with wallets that have enough NIM and wallets that do not.
-- Retest funded-wallet bidding across multiple real Nimiq Pay devices and account layouts, including a wallet where the funded account is not the first/shared-default account. Do not treat the balance gate as submission-ready until the users who reported false `0 NIM` can bid on the current build.
-- Complete at least one genuine auction from listing through verified payment.
-- Confirm that fulfillment terms are visible before bidding and again to the winner after the auction.
-- Confirm bidders cannot place a first bid until they explicitly acknowledge the published delivery / collection terms.
-- Confirm hosts are prompted to publish the fulfillment method, service area or collection location context, expected timeframe, costs, and handoff method without exposing a private home address.
-- Capture a successful auction payment receipt and a reproducible walkthrough.
+- ✅ Verify hosting, bidding, settlement, and payment verification inside Nimiq Pay across two real devices.
+- ✅ Confirm a funded Nimiq Pay bidder can pass the balance gate and place accepted bids from a separate mobile device.
+- Continue broader funded-wallet retesting across different Nimiq Pay devices and account layouts because earlier users reported false `0 NIM` results.
+- ✅ Complete a genuine auction from listing through verified 3 NIM mainnet payment.
+- ✅ Confirm fulfillment terms are visible before bidding and again to the winner after the auction.
+- ✅ Confirm bidders cannot place a first bid until they explicitly acknowledge the published delivery / collection terms.
+- ✅ Confirm hosts are prompted to publish the fulfillment method, service area or collection location context, expected timeframe, costs, and handoff method without exposing a private home address.
+- ✅ Capture a successful real payment receipt and transaction hash: `0c0901c81a0db2fb792da6107a690b74270dc391b55fb12b980d938d4465aa74`.
+- Capture one clean visual soft-close extension by placing a valid bid inside the final 30 seconds.
+- Capture one clean bid-removal proof if it is going into the judge bundle.
 - Confirm listing provenance. Clearly label demonstrations so users cannot mistake them for available goods.
 - Confirm submission eligibility, registration, and required promotion.
 - Gather genuine user feedback and organizer usage evidence. Device paddles and automated tests are not unique-wallet usage.
