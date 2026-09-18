@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://nimgavel.artistic-chip.workers.dev">
+  <a href="https://nimgavel.midelabs.xyz">
     <img src="./public/favicon.svg" width="96" height="96" alt="Nimgavel logo" />
   </a>
 </p>
@@ -16,7 +16,7 @@
   <a href="https://github.com/mystiquemide/nimgavel/actions/workflows/ci.yml">
     <img src="https://github.com/mystiquemide/nimgavel/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" />
   </a>
-  <a href="https://nimgavel.artistic-chip.workers.dev">
+  <a href="https://nimgavel.midelabs.xyz">
     <img src="https://img.shields.io/badge/NIMGAVEL-LIVE-173300?style=for-the-badge" alt="Nimgavel Live" />
   </a>
   <a href="https://www.nimiq.com/nimiq-pay">
@@ -40,19 +40,19 @@
 </p>
 
 <p align="center">
-  <a href="https://nimgavel.artistic-chip.workers.dev"><strong>Launch Nimgavel</strong></a>
+  <a href="https://nimgavel.midelabs.xyz"><strong>Launch Nimgavel</strong></a>
   &nbsp;&nbsp;•&nbsp;&nbsp;
-  <a href="https://nimgavel.artistic-chip.workers.dev/lobby">Auction Floor</a>
+  <a href="https://nimgavel.midelabs.xyz/lobby">Auction Floor</a>
   &nbsp;&nbsp;•&nbsp;&nbsp;
-  <a href="https://nimgavel.artistic-chip.workers.dev/how-it-works">How It Works</a>
+  <a href="https://nimgavel.midelabs.xyz/how-it-works">How It Works</a>
   &nbsp;&nbsp;•&nbsp;&nbsp;
-  <a href="https://nimgavel.artistic-chip.workers.dev/results">Results</a>
+  <a href="https://nimgavel.midelabs.xyz/results">Results</a>
   &nbsp;&nbsp;•&nbsp;&nbsp;
-  <a href="https://nimgavel.artistic-chip.workers.dev/leaderboard">Leaderboard</a>
+  <a href="https://nimgavel.midelabs.xyz/leaderboard">Leaderboard</a>
 </p>
 
 <p align="center">
-  <a href="https://nimgavel.artistic-chip.workers.dev">
+  <a href="https://nimgavel.midelabs.xyz">
     <img src="./public/og.png" width="900" alt="Nimgavel — live community auctions inside Nimiq Pay" />
   </a>
 </p>
@@ -75,7 +75,7 @@ Nimiq Pay handles wallet identity, signatures and the winner payment. Nimgavel h
 
 ## Try Nimgavel
 
-Production: https://nimgavel.artistic-chip.workers.dev
+Production: https://nimgavel.midelabs.xyz
 
 Network: **Nimiq mainnet**  
 Settlement asset: **native NIM**  
@@ -343,6 +343,7 @@ A real two-device auction completed from live bidding through winner payment and
 - Payment: winner → host through Nimiq Pay
 - Transaction reference: `Nimgavel:<lotId>`
 - Verified transaction: [`0c0901c81a0db2fb792da6107a690b74270dc391b55fb12b980d938d4465aa74`](https://nimiq.watch/#0c0901c81a0db2fb792da6107a690b74270dc391b55fb12b980d938d4465aa74)
+- Additional verified mainnet settlement: [`be8486710831dad0c30d5324249cf5f48325bd5cf6cb4bf0280cd6c33dc8bcbe`](https://nimiq.watch/#be8486710831dad0c30d5324249cf5f48325bd5cf6cb4bf0280cd6c33dc8bcbe)
 
 The same run also confirmed separate host and bidder paddles, live WebSocket synchronization, balance-backed bidding, winner locking and the winner-only payment surface. Soft close is enforced by the authoritative auction room and covered by the automated suite.
 
@@ -432,11 +433,11 @@ npm run dev:web
 
 ## Links
 
-- **Live app:** https://nimgavel.artistic-chip.workers.dev
-- **Auction floor:** https://nimgavel.artistic-chip.workers.dev/lobby
-- **Results:** https://nimgavel.artistic-chip.workers.dev/results
-- **Leaderboard:** https://nimgavel.artistic-chip.workers.dev/leaderboard
-- **How it works:** https://nimgavel.artistic-chip.workers.dev/how-it-works
+- **Live app:** https://nimgavel.midelabs.xyz
+- **Auction floor:** https://nimgavel.midelabs.xyz/lobby
+- **Results:** https://nimgavel.midelabs.xyz/results
+- **Leaderboard:** https://nimgavel.midelabs.xyz/leaderboard
+- **How it works:** https://nimgavel.midelabs.xyz/how-it-works
 - **Nimiq Pay:** https://www.nimiq.com/nimiq-pay
 
 ## License
