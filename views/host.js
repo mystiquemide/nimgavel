@@ -299,6 +299,37 @@ export function renderHost(container) {
                     ></textarea>
                   </div>
 
+                  <div class="host-mobile-review" aria-label="Auction preview before publishing">
+                    <span class="preview-box-label">REVIEW BEFORE PUBLISHING</span>
+                    <article class="featured-lot-card">
+                      <div class="card-media-wrap">
+                        <img
+                          src="${escapeAttr(state.imageUrl || defaultPhoto)}"
+                          id="mobile-preview-img"
+                          alt="Auction preview"
+                          class="card-img"
+                        />
+                        <div class="card-status-bar">
+                          <span class="status-badge-live"><span>PREVIEW</span></span>
+                          <span class="status-timer-pill" id="mobile-preview-timer">05:00</span>
+                        </div>
+                      </div>
+                      <div class="card-body">
+                        <h3 class="lot-title" id="mobile-preview-title">1972 Vintage Polaroid SX-70 Land Camera</h3>
+                        <div class="bid-status-box">
+                          <div class="bid-label-row">
+                            <span class="bid-label">STARTING RESERVE</span>
+                            <span class="bid-leader" id="mobile-preview-inc">Min +50 NIM</span>
+                          </div>
+                          <div class="bid-value-row">
+                            <span class="bid-amount-nim" id="mobile-preview-price">500 NIM</span>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                    <p class="form-trust-note">Check the title, image, reserve, increment and duration before asking Nimiq Pay to sign.</p>
+                  </div>
+
                   <!-- Submit Action -->
                   <button type="submit" class="btn-create-submit" id="btn-submit-lot" ${state.creating ? "disabled" : ""}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -307,6 +338,8 @@ export function renderHost(container) {
                     <span>${state.creating ? "Waiting for wallet signature…" : "Sign & Create Auction Room"}</span>
                     <span aria-hidden="true">→</span>
                   </button>
+
+                  <p class="form-trust-note" id="create-status" role="status" aria-live="polite">${state.creating ? "Preparing your auction…" : "Nothing is published until you confirm the signature in Nimiq Pay."}</p>
 
                   ${state.formError ? `<div class="form-error-note" role="alert">${escapeHtml(state.formError)}</div>` : ""}
 
@@ -393,7 +426,10 @@ export function renderHost(container) {
           radio.checked = true;
           const mins = Math.floor(parseInt(radio.value, 10) / 60);
           const timerEl = container.querySelector("#preview-timer-pill");
-          if (timerEl) timerEl.textContent = `${String(mins).padStart(2, "0")}:00`;
+          const mobileTimerEl = container.querySelector("#mobile-preview-timer");
+          const label = `${String(mins).padStart(2, "0")}:00`;
+          if (timerEl) timerEl.textContent = label;
+          if (mobileTimerEl) mobileTimerEl.textContent = label;
         }
       });
     });
@@ -405,8 +441,11 @@ export function renderHost(container) {
 
     if (titleInput) {
       titleInput.addEventListener("input", (e) => {
+        const value = e.target.value.trim() || "1972 Vintage Polaroid SX-70 Land Camera";
         const preview = container.querySelector("#preview-title");
-        if (preview) preview.textContent = e.target.value.trim() || "1972 Vintage Polaroid SX-70 Land Camera";
+        const mobilePreview = container.querySelector("#mobile-preview-title");
+        if (preview) preview.textContent = value;
+        if (mobilePreview) mobilePreview.textContent = value;
       });
     }
 
@@ -447,7 +486,9 @@ export function renderHost(container) {
           if (selected) selected.hidden = false;
           if (dropzone) dropzone.hidden = true;
           const previewImg = container.querySelector("#preview-img");
+          const mobilePreviewImg = container.querySelector("#mobile-preview-img");
           if (previewImg) previewImg.src = dataUri;
+          if (mobilePreviewImg) mobilePreviewImg.src = dataUri;
         } catch (error) {
           state.formError = error.message || "That photo could not be read.";
           render();
@@ -462,23 +503,31 @@ export function renderHost(container) {
         if (selected) selected.hidden = true;
         if (dropzone) dropzone.hidden = false;
         const previewImg = container.querySelector("#preview-img");
+        const mobilePreviewImg = container.querySelector("#mobile-preview-img");
         if (previewImg) previewImg.src = defaultPhoto;
+        if (mobilePreviewImg) mobilePreviewImg.src = defaultPhoto;
       });
     }
 
     if (priceInput) {
       priceInput.addEventListener("input", (e) => {
         const preview = container.querySelector("#preview-price");
+        const mobilePreview = container.querySelector("#mobile-preview-price");
         const val = Number(e.target.value || "0");
-        if (preview) preview.textContent = val > 0 ? `${formatNim(Math.round(val * 100000))} NIM` : "500 NIM";
+        const label = val > 0 ? `${formatNim(Math.round(val * 100000))} NIM` : "500 NIM";
+        if (preview) preview.textContent = label;
+        if (mobilePreview) mobilePreview.textContent = label;
       });
     }
 
     if (incInput) {
       incInput.addEventListener("input", (e) => {
         const incLabel = container.querySelector("#preview-inc-label");
+        const mobileIncLabel = container.querySelector("#mobile-preview-inc");
         const val = Number(e.target.value || "0");
-        if (incLabel) incLabel.textContent = val > 0 ? `Min +${val} NIM` : "Min +50 NIM";
+        const label = val > 0 ? `Min +${val} NIM` : "Min +50 NIM";
+        if (incLabel) incLabel.textContent = label;
+        if (mobileIncLabel) mobileIncLabel.textContent = label;
       });
     }
 
@@ -624,12 +673,19 @@ export function renderHost(container) {
     const imageUrl = state.imageUrl || "";
 
     const submitBtn = container.querySelector("#btn-submit-lot span");
-    if (submitBtn) submitBtn.textContent = "Waiting for wallet signature…";
+    const statusEl = container.querySelector("#create-status");
+    const setCreateStatus = (buttonText, statusText) => {
+      if (submitBtn) submitBtn.textContent = buttonText;
+      if (statusEl) statusEl.textContent = statusText;
+    };
+    setCreateStatus("Preparing wallet request…", "Preparing the auction details before asking Nimiq Pay to sign.");
 
     try {
       const hostAddress = getAccount();
       const challenge = await createHostChallenge(hostAddress);
+      setCreateStatus("Confirm in Nimiq Pay…", "Nimiq Pay is waiting for your signature. Nothing has been published yet.");
       const signed = await signMessage(challenge.challenge.message);
+      setCreateStatus("Publishing auction…", "Signature received. Nimgavel is creating the auction room now.");
 
       const created = await createLot({
         challengeId: challenge.challenge.id,
