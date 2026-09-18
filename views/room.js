@@ -210,7 +210,7 @@ export function renderRoom(container, lotId) {
             </div>
           </div>
         </div>
-        ${!["sold", "settled", "passed"].includes(state.phase) && remaining() !== 0 ? `
+        ${["live", "going_once", "going_twice"].includes(state.phase) && remaining() !== 0 ? `
         <div class="room-sticky-bid-bar" aria-label="Current bid summary">
           <div class="sticky-bid-info">
             <span class="sticky-bid-label">${state.currentBid ? "CURRENT HIGH BID" : "OPENING BID"}</span>
@@ -420,9 +420,17 @@ export function renderRoom(container, lotId) {
   }
 
   function renderActionSection() {
-    // Once the authoritative deadline is reached, never leave stale bid
-    // controls visible while the room waits for the server result.
-    if (remaining() === 0 && !["sold", "settled", "passed"].includes(state.phase)) {
+    if (state.phase === "created") {
+      return `
+        <div class="spectate-deck-note">
+          <p class="spectate-deck-text">This auction has been created but has not started yet. The host needs to start the room before bidding opens.</p>
+        </div>
+      `;
+    }
+
+    // Once a room that was actually live reaches its authoritative deadline,
+    // never leave stale bid controls visible while the server finalizes it.
+    if (remaining() === 0 && ["live", "going_once", "going_twice"].includes(state.phase)) {
       return `
         <div class="spectate-deck-note">
           <p class="spectate-deck-text">Bidding has closed. Waiting for the server to finalize the result…</p>
