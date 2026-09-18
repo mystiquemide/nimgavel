@@ -2849,6 +2849,19 @@ body.animate-ready [data-animate-stagger].in-view > [data-animate-child]:nth-chi
   gap: 10px;
 }
 
+.host-mobile-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+@media (min-width: 900px) {
+  .host-mobile-review {
+    display: none;
+  }
+}
+
 .preview-box-label {
   font-family: var(--font-mono);
   font-size: 11px;
